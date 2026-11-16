@@ -39,6 +39,9 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
+- **Ferie/fravær per ansatt**: enkelt datoer eller intervaller
+  («2025-07-01 til 2025-07-14») i Ansatte-fanen – generatoren tildeler ingen
+  vakter disse dagene
 - **Rotasjonsrullering**: del de ansatte i grupper som roterer gjennom
   skiftene per 4-ukers syklus (valgfri lengde), planlagt dag for dag slik at
   alle aml-regler overholdes ved syklusgrensene

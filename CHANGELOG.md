@@ -3,6 +3,16 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.9 – Ferie og fravær per ansatt
+
+- Ny «Ferie/fravær»-kolonne i Ansatte-fanen
+- Angi enkelt datoer eller intervaller (f.eks. «2025-07-01 til 2025-07-14»),
+  atskilt med komma; «til», «/» og tankestrek støttes som skille
+- Intervaller ekspanderes til enkeltdager ved lagring, ugyldige datoer gir
+  advarsel og hoppes over
+- Generatoren tildeler ingen vakter på utilgjengelige dager, og dekningen
+  fordeles automatisk på de andre
+
 ## 2.8 – Rotasjonsrullering
 
 - Ny «Rotasjonsrullering»-bryter i Generer-fanen med valgfri sykluslengde

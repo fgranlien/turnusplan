@@ -162,7 +162,7 @@ td.ute { background:#f0f1f3; }
       <button id="lagre-ansatte-knapp" onclick="lagreAnsatte()">Lagre ansatte</button>
     </div>
     <div id="ansatte-status"></div>
-    <p class="laster">Radiografer må ha minst én modalitet. Fagradiografer er knyttet til én hovedmodalitet, og kan i tillegg dekte fagradiograf-plassene. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
+    <p class="laster">I Ferie/fravær-feltet kan du angi enkelt datoer eller intervaller (f.eks. «2025-07-01 til 2025-07-14»), atskilt med komma. Radiografer må ha minst én modalitet. Fagradiografer er knyttet til én hovedmodalitet, og kan i tillegg dekte fagradiograf-plassene. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
   </section>
   </div>
   <div id="tab-valider" class="skjult">
@@ -340,7 +340,7 @@ async function lastAnsatte() {
 }
 
 function renderAnsatte() {
-  let html = '<table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Stilling %</th><th>Foretrekker</th><th>Unngå</th><th></th></tr>';
+  let html = '<table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Stilling %</th><th>Foretrekker</th><th>Unngå</th><th>Ferie/fravær</th><th></th></tr>';
   ansatteListe.forEach((a, i) => {
     const fagra = a.yrkesgruppe === 'fagradiograf';
     let modHtml;
@@ -371,6 +371,7 @@ function renderAnsatte() {
       `<td><input type="number" min="10" max="100" value="${a.stillingsprosent}" style="width:64px" oninput="settFelt(${i}, 'stillingsprosent', +this.value)"></td>` +
       `<td>${prefSel('foretrekker')}</td>` +
       `<td>${prefSel('unnga')}</td>` +
+      `<td><input type="text" value="${esc((a.utilgjengelige_dager || []).join(', '))}" style="width:190px" placeholder="2025-07-01 til 2025-07-14" oninput="settFerie(${i}, this.value)"></td>` +
       `<td><button style="background:var(--grå);padding:6px 10px;font-size:12.5px" onclick="fjernAnsatt(${i})">Fjern</button></td>` +
       `</tr>`;
   });
@@ -399,6 +400,10 @@ function settGruppe(i, gruppe) {
 function settHovedMod(i, m) { ansatteListe[i].modaliteter = [m]; }
 
 function settPref(i, felt, verdi) { ansatteListe[i][felt] = verdi ? [verdi] : []; }
+
+function settFerie(i, verdi) {
+  ansatteListe[i].utilgjengelige_dager = verdi.split(',').map(s => s.trim()).filter(Boolean);
+}
 
 function leggTilAnsatt() {
   ansatteListe.push({id: '', navn: 'Ny ansatt', yrkesgruppe: 'radiograf', modaliteter: ['Røntgen'], stillingsprosent: 100, foretrekker: [], unnga: [], utilgjengelige_dager: []});

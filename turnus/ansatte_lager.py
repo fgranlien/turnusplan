@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+import re
+from datetime import date, timedelta
 from pathlib import Path
 
 from .demo_data import MODALITETER, YRKESGRUPPER
@@ -14,6 +15,25 @@ SKIFT_DEFS: dict[str, SkiftDef] = {d.navn: d for d in (DAG, KVELD, NATT, DAG12, 
 
 class AnsattFeil(ValueError):
     pass
+
+
+_RANGE_SKILLE = re.compile(r"\s*(?:til|/|\u2013|\u2014)\s*")
+
+
+def _utvid_datoer(tekst: str) -> tuple[list[date], str | None]:
+    deler = [d for d in _RANGE_SKILLE.split(tekst.strip()) if d]
+    if not deler or len(deler) > 2:
+        return [], tekst
+    try:
+        fra = date.fromisoformat(deler[0][:10])
+        til = date.fromisoformat(deler[-1][:10]) if len(deler) == 2 else fra
+    except ValueError:
+        return [], tekst
+    if til < fra:
+        fra, til = til, fra
+    if (til - fra).days > 400:
+        return [], tekst
+    return [fra + timedelta(days=i) for i in range((til - fra).days + 1)], None
 
 
 def _skift_def(navn) -> SkiftDef | None:
@@ -46,10 +66,11 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
     unnga = {d for d in (_skift_def(s) for s in rad.get("unnga") or []) if d}
     utilgjengelige: set[date] = set()
     for s in rad.get("utilgjengelige_dager") or []:
-        try:
-            utilgjengelige.add(date.fromisoformat(str(s)[:10]))
-        except ValueError:
+        datoer, feil = _utvid_datoer(str(s))
+        if feil is not None:
             advarsler.append(f"{navn}: ugjenkjennelig dato '{s}' (hoppet over)")
+        else:
+            utilgjengelige.update(datoer)
     ansatt_id = str(rad.get("id") or "").strip()
     if not ansatt_id or ansatt_id in brukte_ider:
         teller = indeks + 1
