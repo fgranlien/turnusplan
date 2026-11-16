@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import threading
 import urllib.parse
 import webbrowser
@@ -144,23 +145,38 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+ADRESSE_KANDIDATER = (
+    ("127.0.0.1", socket.AF_INET),
+    ("::1", socket.AF_INET6),
+    ("", socket.AF_INET),
+)
+
+
 def start(port: int = 8765) -> None:
     server = None
+    url = None
     sistefeil: Exception | None = None
-    for p in range(port, port + 20):
-        try:
-            server = ThreadingHTTPServer(("127.0.0.1", p), Handler)
+    for adresse, familie in ADRESSE_KANDIDATER:
+        for p in range(port, port + 20):
+            try:
+                ThreadingHTTPServer.address_family = familie
+                server = ThreadingHTTPServer((adresse, p), Handler)
+                url = f"http://[{adresse}]:{p}" if familie == socket.AF_INET6 else f"http://{adresse or 'localhost'}:{p}"
+                break
+            except OSError as e:
+                sistefeil = e
+                if p == port:
+                    print(f"Port {p} på '{adresse or 'alle grensesnitt'}' utilgjengelig: {e}")
+        if server is not None:
             break
-        except OSError as e:
-            sistefeil = e
-            print(f"Port {p} utilgjengelig: {e}")
     if server is None:
         raise SystemExit(
-            f"Fant ingen ledig port fra {port}. Siste feil: {sistefeil}\n"
+            f"Fant ingen ledig adresse/port fra {port}. Siste feil: {sistefeil}\n"
             f"Sjekk om gamle instanser kjører: lsof -nP -iTCP:{port}-{port + 19} -sTCP:LISTEN\n"
             f"Eller start på en annen port: ./run.sh --gui --port 9000"
         )
-    url = f"http://127.0.0.1:{server.server_address[1]}"
+    if server.server_address[0] not in ("127.0.0.1", "::1"):
+        print("MERK: Serveren lytter på alle lokale grensesnitt (kunne ikke binde loopback).")
     print(f"Turnusplan kjører på {url}  (Ctrl+C for å avslutte)")
     threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
