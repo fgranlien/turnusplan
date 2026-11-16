@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import VERSJON, ansatte_lager, regler, skift_lager
 from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, standard_bemanning
+from .ics_export import bygg_ics
 from .modeller import SkiftDef
 from .generator import TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
@@ -168,6 +169,7 @@ def generer_json(
             for s, k in plan.udekket
         ],
         "validering": feil,
+        "ics": bygg_ics(plan.tildelinger, ansatte, defs, f"Turnusforslag {start.isoformat()}")
     }
 
 

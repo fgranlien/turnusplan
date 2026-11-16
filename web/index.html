@@ -468,11 +468,27 @@ function visTariff(d) {
   return html + '</details>';
 }
 
+let sisteResultat = null;
+
+function lastNedIcs() {
+  if (!sisteResultat || !sisteResultat.ics) return;
+  const blob = new Blob([sisteResultat.ics], {type: 'text/calendar;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'turnus_' + sisteResultat.periode.start + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
 function visGenerert(d) {
+  sisteResultat = d;
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
   const b = d.bemanning;
   const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
   html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · ${d.uker.length} uker · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
+  html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><span class="laster">Importer i kalender eller Minarbeidsplan.</span></div>';
   html += visUkeMatrix(d);
   html += visTariff(d);
   html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th></tr>';

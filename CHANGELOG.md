@@ -3,6 +3,14 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.5 – iCal-eksport av generert turnus
+
+- «Last ned iCal (.ics)»-knapp i Turnus-fanen – én kalenderhendelse per vakt
+  med skifttype, navn, yrkesgruppe og modaliteter
+- Filen kan importeres i kalenderappen eller Minarbeidsplan
+- Riktig CRLF-format, UID per vakt (idempotent import) og linjefolding etter
+  iCal-standarden
+
 ## 2.4 – Mellomvakt og konfigurerbare skift
 
 - Nytt «Skift og mellomvakter»-kort i GUI-et: rediger navn, start, slutt og
