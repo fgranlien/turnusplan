@@ -374,6 +374,18 @@ async function lastSkift() {
   }
 }
 
+function visTab(navn) {
+  for (const t of ['generer', 'turnus', 'ansatte', 'valider']) {
+    document.getElementById('tab-' + t).classList.toggle('skjult', t !== navn);
+    document.getElementById('tabknapp-' + t).classList.toggle('aktiv', t === navn);
+  }
+}
+
+function settUker(uker) {
+  document.getElementById('dager').value = uker * 7;
+  document.querySelectorAll('button.liten').forEach(b => b.classList.toggle('aktiv', b.textContent === uker + ' uker'));
+}
+
 renderBemanning();
 
 function fyllLaasValg() {

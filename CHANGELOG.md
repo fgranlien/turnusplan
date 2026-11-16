@@ -3,6 +3,12 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.15 – Feilretting: fanene i GUI-et
+
+- Faneknappene (Generer/Turnus/Ansatte/Valider iCal) fungerte ikke ved klikk:
+  funksjonen `visTab` ble ved et uhell slettet i v2.4-refaktoren og er nå gjenopprettet
+- «4/6/8/12 uker»-knappene (rullende lengde) fikk også tilbake sin `settUker`-funksjon
+
 ## 2.14 – Daglig bruk og polish
 
 - Siste innstillinger (startdato, dager, norm, motor, rotasjon og syklus) huskes i
