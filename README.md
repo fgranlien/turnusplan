@@ -34,11 +34,33 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 127.0.0.1, ingenting eksponeres mot nettet). Fra GUI-et kan du:
 
 - Generere turnusforslag (velg startdato, lengde og 8 t/12 t-modus)
+- Rullende turnuser på 4, 6, 8 eller 12 uker
 - Velge modaliteter og bemanning per skift, atskilt for hverdag og helg
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
+
+Generert turnus vises i egen fane som vaktmatrise per uke per ansatt (D/K/N),
+med sum timer per uke, totalt og snitt per uke mot valgt arbeidsuke-norm.
+
+### Arbeidsuke-norm (tariff)
+
+Generatoren planlegger mot valgt uketimer-norm (gjennomsnitt over perioden):
+
+| Norm | Gjelder |
+|---|---|
+| 40 t | Lovens maks (aml §10-2/10-3), ingen tariffreduksjon |
+| 37,5 t | Standard arbeidsuke uten turnusreduksjon |
+| 35,5 t | Spekter-overenskomsten del A2 pkt 1.3 (område 10 – helseforetak, bl.a. Helse Møre og Romsdal): turnus med arbeid mellom kl. 20.00–06.00 og/eller søndagsarbeid minst hver 3. søndag, samt døgnkontinuerlig skiftarbeid |
+| 33,6 t | Helkontinuerlig skiftarbeid og turnus sammenlignbart med dette (minst 539 t nattarbeid og 231 t søndagsarbeid per år, jf. NITO-overenskomsten) |
+
+GUI-et viser automatisk om den genererte turnusen utløser 35,5-timers kriteriene.
+Aml (40 t per uke) håndheves alltid som lovfestet tak; tariffnormen brukes som
+planleggingsnorm for snittet og rapporteres som egne tariffbrudd når snittet
+overskrides. Norsk Radiografforbund (NRF) forhandler for radiografer i Spekter-
+området gjennom NITO/SAN; lokale avtaler hos arbeidsgiveren kan avvike, sjekk
+eventuell lokal overenskomst del B.
 
 Uten `ansatte.json` dimensjoneres demopoolen automatisk etter timer per uke og
 nattbehov. Fagradiografer prioriteres til fagradiograf-plassene og kan i tillegg

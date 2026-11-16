@@ -19,7 +19,13 @@ WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
 
 
-def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: dict | None = None) -> dict:
+def generer_json(
+    start: date,
+    antall_dager: int,
+    langvakter: bool,
+    bemanning: dict | None = None,
+    uke_time_norm: float = 40.0,
+) -> dict:
     defs = skift_defs_for(langvakter)
     bemanning_cfg = standard_bemanning()
     for komp, verdier in (bemanning or {}).items():
@@ -36,8 +42,19 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
     else:
         ansatte = bygg_ansatte(behov, defs)
         ansatte_kilde = "demo"
-    plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True).generer()
+    plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm).generer()
     med_id = {a.id: a for a in ansatte}
+
+    uke_start = start - timedelta(days=start.weekday())
+    antall_uker = (antall_dager + start.weekday() + 6) // 7
+    uker = [
+        {
+            "nr": u + 1,
+            "iso": (uke_start + timedelta(days=7 * u)).isocalendar()[1],
+            "start": (uke_start + timedelta(days=7 * u)).isoformat(),
+        }
+        for u in range(antall_uker)
+    ]
 
     dager = []
     for i in range(antall_dager):
@@ -63,6 +80,25 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
     ansatt_rader = []
     for a in ansatte:
         skift_liste = sorted(plan.tildelinger[a.id])
+        skift_per_dag = {s.dato: s for s in skift_liste}
+        uke_rader = []
+        for u in range(antall_uker):
+            ws = uke_start + timedelta(days=7 * u)
+            koder = []
+            for d in range(7):
+                dato = ws + timedelta(days=d)
+                if start <= dato < start + timedelta(days=antall_dager):
+                    s = skift_per_dag.get(dato)
+                    koder.append(s.type.navn[0] if s else "")
+                else:
+                    koder.append(None)
+            timer = sum(
+                s.varighet.total_seconds() / 3600
+                for s in skift_liste
+                if ws <= s.dato < ws + timedelta(days=7)
+            )
+            uke_rader.append({"timer": round(timer, 1), "skift": koder})
+        total_timer = sum(s.varighet.total_seconds() / 3600 for s in skift_liste)
         ansatt_rader.append(
             {
                 "navn": a.navn,
@@ -70,8 +106,10 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
                 "modaliteter": sorted(a.kompetanse & set(MODALITETER)),
                 "prosent": a.stillingsprosent,
                 "skift": len(skift_liste),
-                "timer": sum(s.varighet.total_seconds() / 3600 for s in skift_liste),
+                "timer": total_timer,
+                "snitt_uke": round(total_timer / (antall_dager / 7), 1),
                 "natt": sum(1 for s in skift_liste if s.type.er_natt),
+                "uker": uke_rader,
             }
         )
 
@@ -85,6 +123,8 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
                 pref_totalt += 1
 
     feil = regler.valider_plan(plan.tildelinger, ansatte, behov, start, antall_dager, defs, True)
+    kriterier = regler.turnus_kriterier(plan.tildelinger, ansatte, start, antall_dager, defs)
+    tariff_brudd = regler.tariff_sjekk(plan.tildelinger, ansatte, start, antall_dager, uke_time_norm)
 
     return {
         "modus": "langvakter 12 t" if langvakter else "tredelt turnus 8 t",
@@ -98,6 +138,20 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
         "dager": dager,
         "ansatte": ansatt_rader,
         "preferanser": {"innfridd": pref_innfridd, "totalt": pref_totalt},
+        "uker": uker,
+        "tariff": {
+            "norm": uke_time_norm,
+            "kriterier": kriterier,
+            "brudd": tariff_brudd,
+            "grunnlag": [
+                "Spekter-overenskomsten del A2 pkt 1.3 (omr\u00e5de 10 \u2013 helseforetak, bl.a. Helse M\u00f8re og Romsdal): "
+                "gjennomsnittlig 35,5 t/uke ved arbeid mellom kl. 20.00\u201306.00 og/eller s\u00f8ndagsarbeid minst hver 3. s\u00f8ndag, "
+                "og ved d\u00f8gnkontinuerlig skiftarbeid.",
+                "33,6 t/uke gjelder helkontinuerlig skiftarbeid og turnus sammenlignbart med dette "
+                "(minst 539 t nattarbeid og 231 t s\u00f8ndagsarbeid per \u00e5r, jf. NITO-overenskomsten).",
+                "Arbeidsmilj\u00f8loven \u00a7 10-2/10-3 (40 t) er lovfestet tak og gjelder uansett.",
+            ],
+        },
         "udekket": [
             {"skift": s.etikett, "dato": s.dato.isoformat(), "kompetanse": k.kompetanse}
             for s, k in plan.udekket
@@ -160,7 +214,9 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.loads(kropp)
                 start = date.fromisoformat(data["start"])
                 dager = max(1, min(int(data.get("dager", 14)), 84))
-                resultat = generer_json(start, dager, bool(data.get("langvakter")), data.get("bemanning"))
+                norm = float(data.get("uke_time_norm", 40) or 40)
+                norm = max(20.0, min(40.0, norm))
+                resultat = generer_json(start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm)
             elif self.path == "/api/ansatte":
                 data = json.loads(kropp)
                 antall, advarsler = ansatte_lager.lagre(data)

@@ -34,23 +34,69 @@ td.skift-navn { font-weight:600; white-space:nowrap; }
 .laster { color:var(--grå); font-size:13px; }
 h3 { font-size:15px; margin:20px 0 4px; }
 p { font-size:14px; }
+.tabbar { display:flex; gap:4px; max-width:1000px; margin:8px auto 0; padding:0 32px; }
+.tabbar button { background:#e6e9ee; color:var(--tekst); border-radius:10px 10px 0 0; padding:10px 20px; font-size:14px; }
+.tabbar button.aktiv { background:var(--card); font-weight:600; }
+.skjult { display:none; }
+button.liten { padding:6px 12px; font-size:12.5px; background:#e6e9ee; color:var(--tekst); }
+button.liten.aktiv { background:var(--blå); color:#fff; }
+.rull { overflow-x:auto; }
+table.matrix { font-size:11px; }
+table.matrix th, table.matrix td { padding:3px 4px; text-align:center; border-bottom:1px solid var(--linje); border-right:1px solid var(--linje); }
+table.matrix th { font-size:10px; }
+table.matrix td.navn, table.matrix th.navn { text-align:left; white-space:nowrap; padding-left:8px; }
+table.matrix td.sum { font-weight:600; background:#f7f8fa; }
+td.c-d { background:#e7f6ee; color:var(--grønn); font-weight:600; }
+td.c-k { background:#fdf1e0; color:#b26a00; font-weight:600; }
+td.c-n { background:#e3ecfa; color:#1c4d8f; font-weight:600; }
+td.ute { background:#f0f1f3; }
 </style>
 </head>
 <body>
 <header><h1>Turnusplan</h1><p>Turnusforslag og validering i henhold til arbeidsmiljøloven kap. 10</p></header>
 <main>
+  <div class="tabbar">
+    <button class="tab aktiv" id="tabknapp-generer" onclick="visTab('generer')">Generer</button>
+    <button class="tab" id="tabknapp-turnus" onclick="visTab('turnus')">Turnus</button>
+    <button class="tab" id="tabknapp-ansatte" onclick="visTab('ansatte')">Ansatte</button>
+    <button class="tab" id="tabknapp-valider" onclick="visTab('valider')">Valider iCal</button>
+  </div>
+  <div id="tab-generer">
   <section class="card">
     <h2>Generer turnusforslag</h2>
     <div class="rad">
       <label>Startdato <input type="date" id="start" value="2025-03-03"></label>
-      <label>Antall dager <input type="number" id="dager" value="14" min="7" max="84" step="7"></label>
+      <label>Antall dager <input type="number" id="dager" value="28" min="7" max="84" step="7"></label>
       <label class="sjekk"><input type="checkbox" id="langvakter" onchange="renderBemanning()"> 12-timers langvakter</label>
       <button id="generer-knapp" onclick="generer()">Generer forslag</button>
+    </div>
+    <div class="rad" style="margin-top:10px">
+      <label>Rullende lengde:
+        <span>
+          <button class="liten" onclick="settUker(4)">4 uker</button>
+          <button class="liten" onclick="settUker(6)">6 uker</button>
+          <button class="liten" onclick="settUker(8)">8 uker</button>
+          <button class="liten" onclick="settUker(12)">12 uker</button>
+        </span>
+      </label>
+      <label>Arbeidsuke-norm (tariff)
+        <select id="norm">
+          <option value="40">40 t – kun lovens maks (aml §10-2)</option>
+          <option value="37.5">37,5 t – standard arbeidsuke</option>
+          <option value="35.5" selected>35,5 t – Spekter A2 pkt 1.3 (natt/20–06 eller hver 3. søndag)</option>
+          <option value="33.6">33,6 t – helkontinuerlig/sammenlignbart skiftarbeid</option>
+        </select>
+      </label>
     </div>
     <h3>Bemanning og modaliteter</h3>
     <div id="bemanning"></div>
     <p class="laster">Velg hvilke modaliteter avdelingen dekker, og hvor mange personer per skift som trengs med hver kompetanse. Hverdag = man–fre, helg = lør–søn. Antall ansatte beregnes automatisk; fagradiografer kan dekke alle modaliteter.</p>
   </section>
+  </div>
+  <div id="tab-turnus" class="skjult">
+  <div id="resultat"></div>
+  </div>
+  <div id="tab-ansatte" class="skjult">
   <section class="card">
     <h2>Ansatte</h2>
     <p class="laster" id="ansatte-kilde"></p>
@@ -62,6 +108,8 @@ p { font-size:14px; }
     <div id="ansatte-status"></div>
     <p class="laster">Radiografer må ha minst én modalitet. Fagradiografer er knyttet til én hovedmodalitet, og kan i tillegg dekte fagradiograf-plassene. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
   </section>
+  </div>
+  <div id="tab-valider" class="skjult">
   <section class="card">
     <h2>Valider eksisterende turnus (iCal fra Minarbeidsplan)</h2>
     <div class="rad">
@@ -70,7 +118,7 @@ p { font-size:14px; }
       <button id="valider-knapp" onclick="valider()">Valider mot aml</button>
     </div>
   </section>
-  <div id="resultat"></div>
+  </div>
 </main>
 <script>
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -126,6 +174,18 @@ function hentBemanning() {
     }
   }
   return cfg;
+}
+
+function visTab(navn) {
+  for (const t of ['generer', 'turnus', 'ansatte', 'valider']) {
+    document.getElementById('tab-' + t).classList.toggle('skjult', t !== navn);
+    document.getElementById('tabknapp-' + t).classList.toggle('aktiv', t === navn);
+  }
+}
+
+function settUker(uker) {
+  document.getElementById('dager').value = uker * 7;
+  document.querySelectorAll('button.liten').forEach(b => b.classList.toggle('aktiv', b.textContent === uker + ' uker'));
 }
 
 renderBemanning();
@@ -248,30 +308,82 @@ async function generer() {
       body: JSON.stringify({start: document.getElementById('start').value,
                             dager: +document.getElementById('dager').value,
                             langvakter: document.getElementById('langvakter').checked,
-                            bemanning: hentBemanning()})});
+                            bemanning: hentBemanning(),
+                            uke_time_norm: +document.getElementById('norm').value})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
     visGenerert(data);
+    visTab('turnus');
   } catch (e) {
     document.getElementById('resultat').innerHTML = `<div class="status brudd">Feil: ${esc(e.message)}</div>`;
   }
   knapp.disabled = false; knapp.textContent = 'Generer forslag';
 }
 
+const DAGNAVN = ['man', 'tir', 'ons', 'tor', 'fre', 'lør', 'søn'];
+const KLASSE = {D: 'c-d', K: 'c-k', N: 'c-n'};
+
+function datoEtter(iso, dager) {
+  const dt = new Date(iso + 'T12:00:00');
+  dt.setDate(dt.getDate() + dager);
+  return DAGNAVN[(dt.getDay() + 6) % 7] + ' ' + String(dt.getDate()).padStart(2, '0') + '.' + String(dt.getMonth() + 1).padStart(2, '0');
+}
+
+function visUkeMatrix(d) {
+  let html = '<h3>Vakter per uke per ansatt</h3><div class="rull"><table class="matrix"><tr><th class="navn" rowspan="2">Ansatt</th>';
+  for (const u of d.uker) html += `<th colspan="8">Uke ${u.iso} · fra ${u.start.slice(5)}</th>`;
+  html += '<th rowspan="2">Sum</th><th rowspan="2">Snitt/uke</th></tr><tr>';
+  for (const u of d.uker) {
+    for (let i = 0; i < 7; i++) html += `<th>${datoEtter(u.start, i)}</th>`;
+    html += '<th>Sum</th>';
+  }
+  html += '</tr>';
+  for (const a of d.ansatte) {
+    const gruppe = a.yrkesgruppe === 'fagradiograf' ? 'F' : 'R';
+    html += `<tr><td class="navn"><span class="pill ${esc(a.yrkesgruppe)}">${gruppe}</span> ${esc(a.navn)}</td>`;
+    for (const uw of a.uker) {
+      for (const k of uw.skift) {
+        if (k === null) html += '<td class="ute"></td>';
+        else if (!k) html += '<td>·</td>';
+        else html += `<td class="${KLASSE[k] || ''}">${k}</td>`;
+      }
+      html += `<td class="sum">${uw.timer}</td>`;
+    }
+    html += `<td class="sum">${Math.round(a.timer)}</td><td class="sum">${a.snitt_uke}</td></tr>`;
+  }
+  return html + '</table></div><p class="laster">D = dag · K = kveld · N = natt · · = fri. F = fagradiograf, R = radiograf.</p>';
+}
+
+function visTariff(d) {
+  const t = d.tariff;
+  let html = `<h3>Arbeidsuke-norm (${t.norm} t valgt)</h3>`;
+  if (t.kriterier.length) {
+    html += `<p>Turnusen utløser redusert arbeidsuke etter tariff:</p><ul>`;
+    for (const k of t.kriterier) html += `<li>${esc(k)}</li>`;
+    html += '</ul>';
+    if (t.norm >= 40) html += '<div class="status brudd">Du har valgt 40 t som norm, men turnusen utløser 35,5-timers uke etter Spekter A2 pkt 1.3. Velg 35,5 t i Generer-fanen for å planlegge mot riktig norm.</div>';
+  }
+  if (t.brudd.length) {
+    html += `<div class="status brudd">✗ ${t.brudd.length} ansatt(e) over normen i snitt:<ul>`;
+    for (const b of t.brudd) html += `<li>${esc(b)}</li>`;
+    html += '</ul></div>';
+  } else {
+    html += `<div class="status ok">✓ Alle ansatte ligger i snitt under ${t.norm} t × stillingsprosent per uke.</div>`;
+  }
+  html += '<details><summary class="laster">Tariffgrunnlag</summary>';
+  for (const g of t.grunnlag) html += `<p class="laster">• ${esc(g)}</p>`;
+  return html + '</details>';
+}
+
 function visGenerert(d) {
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
   const b = d.bemanning;
   const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
-  html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
-  html += '<table><tr><th>Dag</th><th>Skift</th><th>Bemanning</th></tr>';
-  for (const dag of d.dager) for (const skift of dag.skift) {
-    const navn = skift.bemanning.map(p => `<span class="pill ${esc(p.yrkesgruppe)}" title="${esc(p.modaliteter.join(', '))}">${esc(p.navn)}</span>`).join('');
-    const ekstra = skift.mangler ? ` <span style="color:var(--rød);font-weight:600">mangler ${skift.mangler}</span>` : '';
-    html += `<tr><td>${esc(dag.ukedag)} ${esc(dag.dato.slice(5))}</td><td class="skift-navn">${esc(skift.navn)}</td><td>${navn || '–'}${ekstra}</td></tr>`;
-  }
-  html += '</table>';
-  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Natt</th></tr>';
-  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.natt}</td></tr>`;
+  html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · ${d.uker.length} uker · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
+  html += visUkeMatrix(d);
+  html += visTariff(d);
+  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th></tr>';
+  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td></tr>`;
   html += '</table>';
   if (d.preferanser.totalt) html += `<p>Preferanser innfridd: ${d.preferanser.innfridd} av ${d.preferanser.totalt}</p>`;
   if (d.udekket.length) {
@@ -279,6 +391,13 @@ function visGenerert(d) {
     for (const u of d.udekket) html += `<li>${esc(u.skift)} ${esc(u.dato)}: ${esc(u.kompetanse)}</li>`;
     html += '</ul>';
   }
+  html += '<h3>Detaljer per skift</h3><table><tr><th>Dag</th><th>Skift</th><th>Bemanning</th></tr>';
+  for (const dag of d.dager) for (const skift of dag.skift) {
+    const navn = skift.bemanning.map(p => `<span class="pill ${esc(p.yrkesgruppe)}" title="${esc(p.modaliteter.join(', '))}">${esc(p.navn)}</span>`).join('');
+    const ekstra = skift.mangler ? ` <span style="color:var(--rød);font-weight:600">mangler ${skift.mangler}</span>` : '';
+    html += `<tr><td>${esc(dag.ukedag)} ${esc(dag.dato.slice(5))}</td><td class="skift-navn">${esc(skift.navn)}</td><td>${navn || '–'}${ekstra}</td></tr>`;
+  }
+  html += '</table>';
   html += valideringHtml(d.validering, 'generert forslag');
   document.getElementById('resultat').innerHTML = html + '</section>';
 }

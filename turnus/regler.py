@@ -13,6 +13,65 @@ MAKS_UKETIMER_NORMAL = 40.0
 MAKS_NATTER_ONK = 4
 UKELANGD = timedelta(days=7)
 
+TARIFF_NORMER = {
+    "lov": {"timer": 40.0, "navn": "Kun lovens maks (40 t)"},
+    "standard": {"timer": 37.5, "navn": "Standard arbeidsuke (37,5 t)"},
+    "spekter_35_5": {"timer": 35.5, "navn": "Spekter A2 pkt 1.3 (35,5 t)"},
+    "helkontinuerlig": {"timer": 33.6, "navn": "Helkontinuerlig/sammenlignbart (33,6 t)"},
+}
+
+
+def _overlapper_20_06(skift_def: SkiftDef) -> bool:
+    return skift_def.start_time < 6 or skift_def.slutt_time > 20
+
+
+def turnus_kriterier(
+    tildelinger: dict[str, list[Skift]],
+    ansatte: list[Ansatt],
+    start_dato: date,
+    antall_dager: int,
+    skift_defs: list[SkiftDef],
+) -> list[str]:
+    kriterier: list[str] = []
+    if any(_overlapper_20_06(d) for d in skift_defs):
+        kriterier.append("Turnusen har arbeid mellom kl. 20.00 og 06.00")
+    uke_start = start_dato - timedelta(days=start_dato.weekday())
+    antall_uker = (antall_dager + start_dato.weekday() + 6) // 7
+    sondager = [uke_start + timedelta(days=7 * u + 6) for u in range(antall_uker)]
+    relevante = [d for d in sondager if start_dato <= d < start_dato + timedelta(days=antall_dager)]
+    if relevante:
+        for skift_liste in tildelinger.values():
+            arbeidet = sum(1 for d in relevante if any(s.dato == d for s in skift_liste))
+            if 3 * arbeidet >= len(relevante):
+                kriterier.append(f"S\u00f8ndagsarbeid minst hver 3. s\u00f8ndag ({arbeidet} av {len(relevante)} s\u00f8ndager)")
+                break
+    return kriterier
+
+
+def tariff_sjekk(
+    tildelinger: dict[str, list[Skift]],
+    ansatte: list[Ansatt],
+    start_dato: date,
+    antall_dager: int,
+    uke_time_norm: float,
+) -> list[str]:
+    brudd: list[str] = []
+    if uke_time_norm >= MAKS_UKETIMER_NORMAL:
+        return brudd
+    uker = antall_dager / 7
+    ansatt_med_id = {a.id: a for a in ansatte}
+    for a_id, skift_liste in tildelinger.items():
+        ansatt = ansatt_med_id[a_id]
+        timer = sum(_timer(s) for s in skift_liste)
+        snitt = timer / uker if uker else 0.0
+        grense = uke_time_norm * ansatt.stillingsprosent / 100
+        if snitt > grense + 1e-9:
+            brudd.append(
+                f"Tariff: {ansatt.navn} har snitt {snitt:.1f} t/uke over perioden "
+                f"(norm {grense:.1f} t ved {ansatt.stillingsprosent:.0f} % stilling)"
+            )
+    return brudd
+
 
 def _timer(skift: Skift) -> float:
     return skift.varighet.total_seconds() / 3600

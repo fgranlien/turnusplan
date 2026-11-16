@@ -33,6 +33,7 @@ class TurnusGenerator:
         antall_dager: int,
         skift_defs: list[SkiftDef] | None = None,
         langvakt_avtale: bool = True,
+        uke_time_norm: float = 40.0,
     ):
         self.ansatte = ansatte
         self.behov = behov
@@ -40,6 +41,7 @@ class TurnusGenerator:
         self.antall_dager = antall_dager
         self.skift_defs = skift_defs if skift_defs is not None else STANDARD_SKIFT
         self.langvakt_avtale = langvakt_avtale
+        self.uke_time_norm = uke_time_norm
         self._plan: dict[str, list[Skift]] = {a.id: [] for a in ansatte}
         self._udekket: list[tuple[Skift, Krav]] = []
 
@@ -64,8 +66,20 @@ class TurnusGenerator:
         if not kandidater:
             self._udekket.append((skift, krav))
             return
+        if self.uke_time_norm < regler.MAKS_UKETIMER_NORMAL:
+            stramme = [a for a in kandidater if self._under_norm(a, skift)]
+            if stramme:
+                kandidater = stramme
         beste = max(kandidater, key=lambda a: (self._score(a, skift, krav), a.id))
         self._plan[beste.id].append(skift)
+
+    def _under_norm(self, ansatt: Ansatt, skift: Skift) -> bool:
+        uker_brukt = (skift.dato - self.start_dato).days // 7 + 1
+        timer = skift.varighet.total_seconds() / 3600 + sum(
+            s.varighet.total_seconds() / 3600 for s in self._plan[ansatt.id]
+        )
+        grense = self.uke_time_norm * ansatt.stillingsprosent / 100
+        return timer / uker_brukt <= grense + 1e-9
 
     def _score(self, ansatt: Ansatt, skift: Skift, krav: Krav) -> float:
         s = 0.0
@@ -95,7 +109,7 @@ class TurnusGenerator:
         return skift.type in onsker or (NATT in onsker and skift.type.er_natt)
 
     def _kapasitet(self, ansatt: Ansatt) -> int:
-        uke_grense = regler.MAKS_UKETIMER_NORMAL * ansatt.stillingsprosent / 100
+        uke_grense = self.uke_time_norm * ansatt.stillingsprosent / 100
         snitt_varighet = sum(d.varighet.total_seconds() / 3600 for d in self.skift_defs) / len(self.skift_defs)
         uker = self.antall_dager / 7
         return max(1, round(uker * uke_grense / snitt_varighet))
