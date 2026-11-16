@@ -3,6 +3,15 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.7 – Forvalg: lagre og last komplett oppsett
+
+- Nytt «Forvalg (lagret oppsett)»-kort i Generer-fanen
+- «Lagre nåværende oppsett» lagrer skift, bemanning per skift,
+  arbeidsuke-norm og ansattliste samlet i `forvalg.json`
+- «Last» gjenoppretter et lagret oppsett: skift og ansatte skrives tilbake
+  til `skift.json`/`ansatte.json` og lastes inn i GUI-et
+- «Slett» fjerner et lagret forvalg
+
 ## 2.6 – Per-person iCal-eksport og mørk modus
 
 - «↓ .ics»-knapp per ansatt i oppsummeringstabellen – eksporterer kun den

@@ -108,6 +108,20 @@ td.ute { background:#f0f1f3; }
     </div>
   </section>
   <section class="card">
+    <h2>Forvalg (lagret oppsett)</h2>
+    <div class="rad">
+      <label>Lagret oppsett
+        <select id="forvalg-valg"></select>
+      </label>
+      <button class="liten" onclick="lastForvalg()">Last</button>
+      <button class="liten" onclick="slettForvalg()">Slett</button>
+      <label>Navn <input type="text" id="forvalg-navn" placeholder="f.eks. Vinter 2026" style="width:160px"></label>
+      <button class="liten" onclick="lagreForvalg()">Lagre nåværende oppsett</button>
+    </div>
+    <div id="forvalg-status"></div>
+    <p class="laster">Lagrer skift, bemanning, arbeidsuke-norm og ansattliste samlet. «Last» overskriver gjeldende oppsett (og skift.json/ansatte.json) med det lagrede.</p>
+  </section>
+  <section class="card">
     <h2>Skift og mellomvakter</h2>
     <div class="rad">
       <label>Forhåndsvalg:
@@ -161,7 +175,7 @@ td.ute { background:#f0f1f3; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 const MODALITETER = ['R\u00f8ntgen', 'CT', 'MR', 'Ultralyd', 'Mammografi', 'Intervensjon'];
-const standardValgte = ['R\u00f8ntgen', 'CT', 'MR'];
+let standardValgte = ['R\u00f8ntgen', 'CT', 'MR'];
 let bemanningVerdier = {};
 let skiftListe = [];
 
@@ -409,7 +423,82 @@ async function lagreAnsatte() {
   knapp.disabled = false; knapp.textContent = 'Lagre ansatte';
 }
 
+async function lastForvalgListe() {
+  try {
+    const r = await fetch('/api/forvalg');
+    const d = await r.json();
+    const sel = document.getElementById('forvalg-valg');
+    sel.innerHTML = (d.forvalg || []).map(p => `<option value="${esc(p.navn)}">${esc(p.navn)}</option>`).join('') || '<option value="">(ingen lagrede)</option>';
+  } catch (e) {}
+}
+
+async function lagreForvalg() {
+  const navn = document.getElementById('forvalg-navn').value.trim();
+  const statusEl = document.getElementById('forvalg-status');
+  if (!navn) { statusEl.innerHTML = '<div class="status brudd">Gi forvalget et navn f\u00f8rst.</div>'; return; }
+  try {
+    const r = await fetch('/api/forvalg', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({navn, skift: skiftListe, bemanning: hentBemanning(), uke_time_norm: +document.getElementById('norm').value, ansatte: ansatteListe})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.feil || r.status);
+    statusEl.innerHTML = `<div class="status ok">\u2713 Lagret oppsett \u00ab${esc(d.navn)}\u00bb (${d.antall} lagrede forvalg).</div>`;
+    await lastForvalgListe();
+    document.getElementById('forvalg-valg').value = d.navn;
+  } catch (e) {
+    statusEl.innerHTML = `<div class="status brudd">Kunne ikke lagre forvalg: ${esc(e.message)}</div>`;
+  }
+}
+
+async function lastForvalg() {
+  const navn = document.getElementById('forvalg-valg').value;
+  const statusEl = document.getElementById('forvalg-status');
+  if (!navn) { statusEl.innerHTML = '<div class="status brudd">Ingen forvalg valgt.</div>'; return; }
+  try {
+    const r = await fetch('/api/forvalg/last', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({navn})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.feil || r.status);
+    const p = d.profil;
+    if (Array.isArray(p.skift) && p.skift.length) { skiftListe = p.skift; renderSkift(); }
+    bemanningVerdier = {};
+    const komps = new Set();
+    for (const [sn, komp] of Object.entries(p.bemanning || {})) {
+      for (const [k, verdier] of Object.entries(komp || {})) {
+        if (k !== 'fagradiograf') komps.add(k);
+        bemanningVerdier[`${sn}|${k}|hverdag`] = verdier.hverdag;
+        bemanningVerdier[`${sn}|${k}|helg`] = verdier.helg;
+      }
+    }
+    if (komps.size) { standardValgte = MODALITETER.filter(m => komps.has(m)); renderBemanning(); }
+    else renderBemanningTabell();
+    if (p.uke_time_norm) document.getElementById('norm').value = p.uke_time_norm;
+    if (Array.isArray(p.ansatte) && p.ansatte.length) {
+      ansatteListe = p.ansatte.map(a => ({...a, modaliteter: [...a.modaliteter], foretrekker: [...(a.foretrekker || [])], unnga: [...(a.unnga || [])], utilgjengelige_dager: [...(a.utilgjengelige_dager || [])]}));
+      ansatteKilde = 'lagret';
+      renderAnsatte();
+    }
+    statusEl.innerHTML = `<div class="status ok">\u2713 Lastet oppsett \u00ab${esc(p.navn)}\u00bb. Skift og ansatte er n\u00e5 lagret-tilstand.</div>`;
+  } catch (e) {
+    statusEl.innerHTML = `<div class="status brudd">Kunne ikke laste forvalg: ${esc(e.message)}</div>`;
+  }
+}
+
+async function slettForvalg() {
+  const navn = document.getElementById('forvalg-valg').value;
+  const statusEl = document.getElementById('forvalg-status');
+  if (!navn) { statusEl.innerHTML = '<div class="status brudd">Ingen forvalg valgt.</div>'; return; }
+  try {
+    const r = await fetch('/api/forvalg?navn=' + encodeURIComponent(navn), {method:'DELETE'});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.feil || r.status);
+    statusEl.innerHTML = d.ok ? `<div class="status ok">\u2713 Slettet \u00ab${esc(navn)}\u00bb.</div>` : `<div class="status brudd">Fant ikke \u00ab${esc(navn)}\u00bb.</div>`;
+    await lastForvalgListe();
+  } catch (e) {
+    statusEl.innerHTML = `<div class="status brudd">Kunne ikke slette: ${esc(e.message)}</div>`;
+  }
+}
+
 lastAnsatte();
+lastForvalgListe();
 
 async function generer() {
   const knapp = document.getElementById('generer-knapp');

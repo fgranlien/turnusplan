@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import VERSJON, ansatte_lager, regler, skift_lager
+from . import VERSJON, ansatte_lager, forvalg_lager, regler, skift_lager
 from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, standard_bemanning
 from .ics_export import bygg_ics
 from .modeller import SkiftDef
@@ -245,6 +245,9 @@ class Handler(BaseHTTPRequestHandler):
                 rader = [ansatte_lager.til_rad(a) for a in pool]
             resultat = {"kilde": kilde, "modaliteter": MODALITETER, "ansatte": rader}
             self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+        elif sti == "/api/forvalg":
+            resultat = {"forvalg": forvalg_lager.les_alle()}
+            self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         elif sti == "/api/skift":
             lagrede = skift_lager.les_lagrede()
             defs = lagrede or skift_lager.standard()
@@ -275,6 +278,24 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.loads(kropp)
                 antall, defs = skift_lager.lagre(data)
                 resultat = {"ok": True, "antall": antall, "skift": [skift_lager.til_rad(d) for d in defs]}
+            elif self.path == "/api/forvalg":
+                data = json.loads(kropp)
+                profil = forvalg_lager.lagre(data)
+                resultat = {"ok": True, "navn": profil["navn"], "antall": len(forvalg_lager.les_alle())}
+            elif self.path == "/api/forvalg/last":
+                data = json.loads(kropp)
+                navn = str(data.get("navn", "")).strip()
+                profil = forvalg_lager.les(navn)
+                if not profil:
+                    self._send(404, json.dumps({"feil": f"Fant ikke forvalg '{navn}'"}, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+                    return
+                skift = profil.get("skift")
+                if isinstance(skift, list) and skift:
+                    skift_lager.lagre(skift)
+                ansatte = profil.get("ansatte")
+                if isinstance(ansatte, list) and ansatte:
+                    ansatte_lager.lagre(ansatte)
+                resultat = {"ok": True, "profil": profil}
             elif self.path == "/api/ansatte":
                 data = json.loads(kropp)
                 antall, advarsler = ansatte_lager.lagre(data)
@@ -291,6 +312,19 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             melding = json.dumps({"feil": str(e)}, ensure_ascii=False).encode("utf-8")
             self._send(400, melding, "application/json; charset=utf-8")
+
+    def do_DELETE(self) -> None:
+        sti = urllib.parse.urlsplit(self.path).path
+        if sti == "/api/forvalg":
+            spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            navn = spørring.get("navn", [""])[0].strip()
+            if not navn:
+                self._send(400, json.dumps({"feil": "navn må oppgis"}, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+                return
+            slettet = forvalg_lager.slett(navn)
+            self._send(200, json.dumps({"ok": slettet}, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+        else:
+            self._send(404, b"ikke funnet", "text/plain; charset=utf-8")
 
     def log_message(self, *args) -> None:
         pass

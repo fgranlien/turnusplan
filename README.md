@@ -39,6 +39,9 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
+- Lagre hele oppsettet (skift, bemanning, arbeidsuke-norm og ansatte) som et
+  **forvalg** under et eget navn, og last det tilbake senere – lagres i
+  `forvalg.json`
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
 - Laste ned generert turnus som `.ics` (én hendelse per vakt) for import i
   kalender eller Minarbeidsplan – hele avdelingen eller per person
