@@ -45,6 +45,24 @@ table.matrix { font-size:11px; }
 table.matrix th, table.matrix td { padding:3px 4px; text-align:center; border-bottom:1px solid var(--linje); border-right:1px solid var(--linje); }
 table.matrix th { font-size:10px; }
 table.matrix td.navn, table.matrix th.navn { text-align:left; white-space:nowrap; padding-left:8px; }
+table.matrix td.navn { position:sticky; left:0; background:var(--card); z-index:1; }
+body.mork { --bg:#14181d; --card:#1d232a; --tekst:#e4e9ee; --grå:#98a4b0; --linje:#2c343d; }
+body.mork .tabbar button { background:#242c35; color:var(--tekst); }
+body.mork .tabbar button.aktiv { background:var(--card); }
+body.mork input, body.mork select { background:#242c35; color:var(--tekst); border-color:var(--linje); }
+body.mork button.liten { background:#242c35; color:var(--tekst); }
+body.mork .pill { background:#24303f; }
+body.mork .pill.fagradiograf { background:#33274a; }
+body.mork .pill.radiograf { background:#1e3229; }
+body.mork .status.ok { background:#16302a; }
+body.mork .status.brudd { background:#3a1d1a; }
+body.mork td.c-d { background:#1e3229; }
+body.mork td.c-k { background:#3a2c14; }
+body.mork td.c-n { background:#1c2c42; }
+body.mork td.c-m { background:#3a3316; }
+body.mork td.ute { background:#191e24; }
+body.mork table.matrix td.sum { background:#242c35; }
+body.mork table.matrix td.navn { background:#1d232a; }
 table.matrix td.sum { font-weight:600; background:#f7f8fa; }
 td.c-d { background:#e7f6ee; color:var(--grønn); font-weight:600; }
 td.c-k { background:#fdf1e0; color:#b26a00; font-weight:600; }
@@ -54,7 +72,7 @@ td.ute { background:#f0f1f3; }
 </style>
 </head>
 <body>
-<header><h1>Turnusplan <span id="versjon" class="laster"></span></h1><p>Turnusforslag og validering i henhold til arbeidsmiljøloven kap. 10</p></header>
+<header style="display:flex;justify-content:space-between;align-items:start;gap:16px"><div><h1>Turnusplan <span id="versjon" class="laster"></span></h1><p>Turnusforslag og validering i henhold til arbeidsmiljøloven kap. 10</p></div><button class="liten" id="mork-knapp" onclick="byttMork()">Mørk modus</button></header>
 <main>
   <div class="tabbar">
     <button class="tab aktiv" id="tabknapp-generer" onclick="visTab('generer')">Generer</button>
@@ -482,6 +500,35 @@ function lastNedIcs() {
   URL.revokeObjectURL(a.href);
 }
 
+async function lastNedIcsPerson(navn) {
+  try {
+    const r = await fetch('/api/eksport?navn=' + encodeURIComponent(navn));
+    if (!r.ok) throw new Error('Fant ikke eksport – generer turnusen på nytt');
+    const blob = new Blob([await r.text()], {type: 'text/calendar;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'turnus_' + navn.replace(/[^A-Za-z0-9æøåÆØÅ]+/g, '_') + '.ics';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    document.getElementById('resultat').innerHTML = `<div class="status brudd">${esc(e.message)}</div>`;
+  }
+}
+
+function byttMork() {
+  document.body.classList.toggle('mork');
+  const mork = document.body.classList.contains('mork');
+  localStorage.setItem('turnusplan-mork', mork ? '1' : '0');
+  document.getElementById('mork-knapp').textContent = mork ? 'Lys modus' : 'Mørk modus';
+}
+
+(function initMork() {
+  const pref = localStorage.getItem('turnusplan-mork');
+  if (pref === '1' || (pref === null && window.matchMedia('(prefers-color-scheme: dark)').matches)) byttMork();
+})();
+
 function visGenerert(d) {
   sisteResultat = d;
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
@@ -491,8 +538,8 @@ function visGenerert(d) {
   html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><span class="laster">Importer i kalender eller Minarbeidsplan.</span></div>';
   html += visUkeMatrix(d);
   html += visTariff(d);
-  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th></tr>';
-  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td></tr>`;
+  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th><th>iCal</th></tr>';
+  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td><td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
   html += '</table>';
   if (d.preferanser.totalt) html += `<p>Preferanser innfridd: ${d.preferanser.innfridd} av ${d.preferanser.totalt}</p>`;
   if (d.udekket.length) {

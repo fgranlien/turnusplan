@@ -41,7 +41,8 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
   for demopoolen
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
 - Laste ned generert turnus som `.ics` (én hendelse per vakt) for import i
-  kalender eller Minarbeidsplan
+  kalender eller Minarbeidsplan – hele avdelingen eller per person
+  («↓ .ics»-knappen per ansatt i oppsummeringstabellen)
 
 Generert turnus vises i egen fane som vaktmatrise per uke per ansatt (D/K/N/M),
 med sum timer per uke, totalt og snitt per uke mot valgt arbeidsuke-norm.

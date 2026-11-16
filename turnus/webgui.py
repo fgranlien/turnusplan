@@ -20,6 +20,8 @@ from .modeller import Skift
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
 
+_siste_eksport: dict[str, str] = {}
+
 
 def generer_json(
     start: date,
@@ -138,7 +140,7 @@ def generer_json(
 
     maks_var = max(d.varighet.total_seconds() / 3600 for d in defs)
     modus = "langvakter 12 t" if maks_var > 10 else "8-timers turnus"
-    return {
+    resultat = {
         "modus": modus,
         "bemanning": bemanning_cfg,
         "antall_ansatte": len(ansatte),
@@ -172,6 +174,18 @@ def generer_json(
         "ics": bygg_ics(plan.tildelinger, ansatte, defs, f"Turnusforslag {start.isoformat()}")
     }
 
+    _siste_eksport.clear()
+    for a in ansatte:
+        if not plan.tildelinger.get(a.id):
+            continue
+        _siste_eksport[a.navn] = bygg_ics(
+            {a.id: plan.tildelinger[a.id]},
+            [a],
+            defs,
+            f"Turnus {a.navn} {start.isoformat()}",
+        )
+    return resultat
+
 
 def valider_json(tekst: str, filnavn: str, stillingsprosent: float) -> dict:
     vakter, merknader = les_ics_tekst(tekst)
@@ -202,9 +216,24 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(innhold)
 
     def do_GET(self) -> None:
-        if self.path in ("/", "/index.html"):
+        sti = urllib.parse.urlsplit(self.path).path
+        if sti == "/api/eksport":
+            spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            navn = spørring.get("navn", [""])[0]
+            ics = _siste_eksport.get(navn)
+            if not ics:
+                self._send(404, b'{"feil": "Ingen generert turnus funnet for denne personen"}', "application/json; charset=utf-8")
+                return
+            filnavn = "".join(c if c.isalnum() else "_" for c in navn) or "ansatt"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/calendar; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="turnus_{filnavn}.ics"')
+            self.send_header("Content-Length", str(len(ics.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(ics.encode("utf-8"))
+        elif sti in ("/", "/index.html"):
             self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-        elif self.path == "/api/ansatte":
+        elif sti == "/api/ansatte":
             lagrede = ansatte_lager.les_lagrede()
             if lagrede:
                 kilde = "lagret"
@@ -216,7 +245,7 @@ class Handler(BaseHTTPRequestHandler):
                 rader = [ansatte_lager.til_rad(a) for a in pool]
             resultat = {"kilde": kilde, "modaliteter": MODALITETER, "ansatte": rader}
             self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
-        elif self.path == "/api/skift":
+        elif sti == "/api/skift":
             lagrede = skift_lager.les_lagrede()
             defs = lagrede or skift_lager.standard()
             resultat = {

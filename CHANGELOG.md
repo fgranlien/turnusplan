@@ -3,6 +3,13 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.6 – Per-person iCal-eksport og mørk modus
+
+- «↓ .ics»-knapp per ansatt i oppsummeringstabellen – eksporterer kun den
+  personens vakter, klar for å sendes til den enkelte
+- Mørk modus med lagret valg (følger systeminnstillingen første gang)
+- Navnekolonnen i vaktmatrisen er frossen ved horisontal rulling
+
 ## 2.5 – iCal-eksport av generert turnus
 
 - «Last ned iCal (.ics)»-knapp i Turnus-fanen – én kalenderhendelse per vakt
