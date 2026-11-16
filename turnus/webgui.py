@@ -146,14 +146,20 @@ class Handler(BaseHTTPRequestHandler):
 
 def start(port: int = 8765) -> None:
     server = None
+    sistefeil: Exception | None = None
     for p in range(port, port + 20):
         try:
             server = ThreadingHTTPServer(("127.0.0.1", p), Handler)
             break
-        except OSError:
-            continue
+        except OSError as e:
+            sistefeil = e
+            print(f"Port {p} utilgjengelig: {e}")
     if server is None:
-        raise SystemExit(f"Fant ingen ledig port fra {port}")
+        raise SystemExit(
+            f"Fant ingen ledig port fra {port}. Siste feil: {sistefeil}\n"
+            f"Sjekk om gamle instanser kjører: lsof -nP -iTCP:{port}-{port + 19} -sTCP:LISTEN\n"
+            f"Eller start på en annen port: ./run.sh --gui --port 9000"
+        )
     url = f"http://127.0.0.1:{server.server_address[1]}"
     print(f"Turnusplan kjører på {url}  (Ctrl+C for å avslutte)")
     threading.Timer(0.5, lambda: webbrowser.open(url)).start()

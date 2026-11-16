@@ -63,6 +63,7 @@ def main() -> None:
     parser.add_argument("--dager", type=int, default=14, help="Antall dager i horisonten")
     parser.add_argument("--langvakter", action="store_true", help="Bruk 12-timers langvakter (dag 07-19, natt 19-07)")
     parser.add_argument("--gui", action="store_true", help="Start grafisk grensesnitt i nettleseren")
+    parser.add_argument("--port", type=int, default=8765, help="Port for GUI-et (standard 8765)")
     parser.add_argument("--valider-fil", metavar="FIL.ICS", help="Valider en eksisterende turnus i iCal-format i stedet for å generere")
     parser.add_argument("--stillingsprosent", type=float, default=100.0, help="Stillingsprosent for validering (standard 100)")
     args = parser.parse_args()
@@ -70,7 +71,7 @@ def main() -> None:
     if args.gui:
         from turnus.webgui import start
 
-        start()
+        start(args.port)
         return
 
     if args.valider_fil:
