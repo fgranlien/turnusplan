@@ -69,6 +69,13 @@ td.c-k { background:#fdf1e0; color:#b26a00; font-weight:600; }
 td.c-n { background:#e3ecfa; color:#1c4d8f; font-weight:600; }
 td.c-m { background:#fdf6dd; color:#8a7500; font-weight:600; }
 td.ute { background:#f0f1f3; }
+.badge { display:inline-block; font-size:9px; border-radius:4px; padding:1px 3px; margin-left:3px; background:#eef3fb; color:var(--blå); font-weight:600; vertical-align:middle; }
+body.mork .badge { background:#24303f; }
+.under { color:#b26a00; font-size:11px; white-space:nowrap; margin-left:4px; }
+.modal-bakgrunn { position:fixed; inset:0; background:rgba(20,26,33,.55); display:flex; align-items:center; justify-content:center; z-index:10; }
+.modal { background:var(--card); color:var(--tekst); border-radius:12px; padding:20px 24px; max-width:560px; width:92%; max-height:80vh; overflow:auto; }
+.modal h3 { margin-top:0; }
+.modal .lukk { float:right; background:#e6e9ee; color:var(--tekst); padding:4px 10px; font-size:12.5px; }
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   body, body.mork { --bg:#fff; --card:#fff; --tekst:#000; --grå:#555; --linje:#bbb; }
@@ -179,6 +186,18 @@ td.ute { background:#f0f1f3; }
     <div id="bemanning"></div>
     <p class="laster">Velg hvilke modaliteter avdelingen dekker. I hver celle: øverste felt = hverdag (man–fre), nederste = helg (lør–søn). Antall ansatte beregnes automatisk.</p>
   </section>
+  <section class="card">
+    <h2>Låste vakter</h2>
+    <div class="rad">
+      <label>Ansatt <select id="laas-navn"></select></label>
+      <label>Dato <input type="date" id="laas-dato"></label>
+      <label>Skift <select id="laas-skift"></select></label>
+      <button class="liten" onclick="laasVakt()">Lås vakt</button>
+      <button class="liten" onclick="nullstillLaaste()">Nullstill</button>
+    </div>
+    <div id="laaste-liste"></div>
+    <p class="laster">Låste vakter fordeles først av generatoren. Vakter som bryter aml-reglene eller kompetansekravene avvises med begrunnelse i resultatet.</p>
+  </section>
   </div>
   <div id="tab-turnus" class="skjult">
   <div id="resultat"></div>
@@ -214,6 +233,8 @@ const MODALITETER = ['R\u00f8ntgen', 'CT', 'MR', 'Ultralyd', 'Mammografi', 'Inte
 let standardValgte = ['R\u00f8ntgen', 'CT', 'MR'];
 let bemanningVerdier = {};
 let skiftListe = [];
+let laasteVakter = [];
+const MOD_KORT = {'Røntgen':'RX', 'CT':'CT', 'MR':'MR', 'Ultralyd':'UL', 'Mammografi':'MG', 'Intervensjon':'IV'};
 
 const SKIFT_PRESETS = {
   standard: [['DAG', '07:00', '15:00', true, true], ['KVELD', '15:00', '23:00', true, true], ['NATT', '23:00', '07:00', true, true]],
@@ -344,12 +365,45 @@ async function lastSkift() {
     document.getElementById('versjon').textContent = 'v' + d.versjon;
     renderSkift();
     renderBemanningTabell();
+    fyllLaasValg();
   } catch (e) {
     document.getElementById('skift-status').innerHTML = `<div class="status brudd">Kunne ikke laste skift: ${esc(e.message)}</div>`;
   }
 }
 
 renderBemanning();
+
+function fyllLaasValg() {
+  const navnSel = document.getElementById('laas-navn');
+  const skiftSel = document.getElementById('laas-skift');
+  const navnValgt = navnSel.value;
+  navnSel.innerHTML = ansatteListe.map(a => `<option value="${esc(a.navn)}">${esc(a.navn)}</option>`).join('');
+  if (navnValgt && ansatteListe.some(a => a.navn === navnValgt)) navnSel.value = navnValgt;
+  const skiftValgt = skiftSel.value;
+  skiftSel.innerHTML = skiftListe.map(s => `<option value="${esc(s.navn)}">${esc(s.navn)}</option>`).join('');
+  if (skiftValgt && skiftListe.some(s => s.navn === skiftValgt)) skiftSel.value = skiftValgt;
+  document.getElementById('laas-dato').value = document.getElementById('start').value;
+}
+
+function laasVakt() {
+  const navn = document.getElementById('laas-navn').value;
+  const dato = document.getElementById('laas-dato').value;
+  const skift = document.getElementById('laas-skift').value;
+  if (!navn || !dato || !skift) return;
+  if (!laasteVakter.some(v => v.navn === navn && v.dato === dato && v.skift === skift)) laasteVakter.push({navn, dato, skift});
+  renderLaaste();
+}
+
+function fjernLaas(i) { laasteVakter.splice(i, 1); renderLaaste(); }
+
+function nullstillLaaste() { laasteVakter = []; renderLaaste(); }
+
+function renderLaaste() {
+  const el = document.getElementById('laaste-liste');
+  el.innerHTML = laasteVakter.length
+    ? '<table>' + laasteVakter.map((v, i) => `<tr><td>${esc(v.navn)}</td><td>${esc(v.dato)}</td><td>${esc(v.skift)}</td><td><button class="liten" onclick="fjernLaas(${i})">Fjern</button></td></tr>`).join('') + '</table>'
+    : '<p class="laster">Ingen låste vakter.</p>';
+}
 
 let ansatteListe = [];
 let ansatteKilde = 'demo';
@@ -365,6 +419,7 @@ async function lastAnsatte() {
       ? 'Redigerer lagret ansattliste (ansatte.json).'
       : 'Viser demopool – rediger og lagre for å bruke egne ansatte i stedet.';
     renderAnsatte();
+    fyllLaasValg();
   } catch (e) {
     document.getElementById('ansatte-status').innerHTML = `<div class="status brudd">Kunne ikke laste ansatte: ${esc(e.message)}</div>`;
   }
@@ -538,8 +593,11 @@ async function slettForvalg() {
   }
 }
 
+lastSkift();
 lastAnsatte();
 lastForvalgListe();
+fyllLaasValg();
+renderLaaste();
 
 async function generer() {
   const knapp = document.getElementById('generer-knapp');
@@ -553,7 +611,8 @@ async function generer() {
                             uke_time_norm: +document.getElementById('norm').value,
                             rotasjon: document.getElementById('rotasjon').checked,
                             syklus_uker: +document.getElementById('syklus').value || 4,
-                            motor: document.getElementById('motor').value})});
+                            motor: document.getElementById('motor').value,
+                            laaste: laasteVakter})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
     visGenerert(data);
@@ -584,7 +643,8 @@ function visUkeMatrix(d) {
   html += '</tr>';
   for (const a of d.ansatte) {
     const gruppe = a.yrkesgruppe === 'fagradiograf' ? 'F' : 'R';
-    html += `<tr><td class="navn"><span class="pill ${esc(a.yrkesgruppe)}">${gruppe}</span> ${esc(a.navn)}</td>`;
+    const badges = (a.modaliteter || []).map(m => `<span class="badge">${MOD_KORT[m] || m.slice(0, 2).toUpperCase()}</span>`).join('');
+    html += `<tr><td class="navn" style="cursor:pointer" onclick="visAnsattDetalj('${esc(a.navn)}')" title="Klikk for å se alle vakter"><span class="pill ${esc(a.yrkesgruppe)}">${gruppe}</span> ${esc(a.navn)}${badges}</td>`;
     for (const uw of a.uker) {
       for (const k of uw.skift) {
         if (k === null) html += '<td class="ute"></td>';
@@ -595,7 +655,7 @@ function visUkeMatrix(d) {
     }
     html += `<td class="sum">${Math.round(a.timer)}</td><td class="sum">${a.snitt_uke}</td></tr>`;
   }
-  return html + '</table></div><p class="laster">D = dag · K = kveld · N = natt · · = fri. F = fagradiograf, R = radiograf.</p>';
+  return html + '</table></div><p class="laster">D = dag · K = kveld · N = natt · · = fri. F = fagradiograf, R = radiograf. Klikk på navnet for å se alle vakter med klokkeslett.</p>';
 }
 
 function visTariff(d) {
@@ -620,6 +680,7 @@ function visTariff(d) {
 }
 
 let sisteResultat = null;
+let forrigeResultat = null;
 
 function lastNedIcs() {
   if (!sisteResultat || !sisteResultat.ics) return;
@@ -663,14 +724,20 @@ function byttMork() {
 })();
 
 function visGenerert(d) {
+  forrigeResultat = sisteResultat;
   sisteResultat = d;
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
   const b = d.bemanning;
   const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
   html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · ${d.uker.length} uker · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
-  html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><button onclick="window.print()">Skriv ut / lagre som PDF</button><span class="laster">Importer i kalender eller Minarbeidsplan. Utskrift blir automatisk A4 landskap med kun turnusen.</span></div>';
+  html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><button onclick="window.print()">Skriv ut / lagre som PDF</button>' + (forrigeResultat ? '<button class="liten" onclick="visSammenligning()">Sammenlign med forrige</button>' : '') + '<span class="laster">Importer i kalender eller Minarbeidsplan. Utskrift blir automatisk A4 landskap med kun turnusen.</span></div>';
   if (d.rotasjon && d.rotasjon.aktiv) {
     html += `<div class="status ok">Rotasjonsrullering aktiv: ${d.rotasjon.grupper} grupper roterer gjennom skiftene per ${d.rotasjon.syklus_uker}-ukers syklus. Personlige preferanser er deaktivert i rotasjonsmodus.</div>`;
+  }
+  if (d.laaste_feilet && d.laaste_feilet.length) {
+    html += '<div class="status brudd">Låste vakter som ble avvist:<ul>';
+    for (const f of d.laaste_feilet) html += `<li>${esc(f)}</li>`;
+    html += '</ul></div>';
   }
   if (d.motor) {
     const m = d.motor;
@@ -681,16 +748,22 @@ function visGenerert(d) {
     html += `<p class="laster">${esc(txt)}</p>`;
   }
   html += visUkeMatrix(d);
+  html += '<div id="sammenligning"></div>';
   html += visTariff(d);
   html += visVaktbytte(d);
   const rot = d.rotasjon && d.rotasjon.aktiv;
   html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th>' + (rot ? '<th>Gruppe</th>' : '') + '<th>iCal</th></tr>';
-  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td>${rot ? `<td>${a.rotasjonsgruppe || ''}</td>` : ''}<td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
+  const norm = d.tariff.norm;
+  for (const a of d.ansatte) {
+    const grense = norm * a.prosent / 100;
+    const under = a.snitt_uke < grense - 0.5 ? `<span class="under">ⓘ ${(grense - a.snitt_uke).toFixed(1)} t under</span>` : '';
+    html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}${under}</td><td>${a.natt}</td>${rot ? `<td>${a.rotasjonsgruppe || ''}</td>` : ''}<td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
+  }
   html += '</table>';
   if (d.preferanser.totalt) html += `<p>Preferanser innfridd: ${d.preferanser.innfridd} av ${d.preferanser.totalt}</p>`;
   if (d.udekket.length) {
     html += '<h3>Udekket behov</h3><ul>';
-    for (const u of d.udekket) html += `<li>${esc(u.skift)} ${esc(u.dato)}: ${esc(u.kompetanse)}</li>`;
+    for (const u of d.udekket) html += `<li>${esc(u.skift)} ${esc(u.dato)}: ${esc(u.kompetanse)} – <span class="laster">${esc(u.forslag || '')}</span></li>`;
     html += '</ul>';
   }
   html += '<h3>Detaljer per skift</h3><table><tr><th>Dag</th><th>Skift</th><th>Bemanning</th></tr>';
@@ -702,6 +775,47 @@ function visGenerert(d) {
   html += '</table>';
   html += valideringHtml(d.validering, 'generert forslag');
   document.getElementById('resultat').innerHTML = html + '</section>';
+}
+
+function visAnsattDetalj(navn) {
+  const a = ((sisteResultat && sisteResultat.ansatte) || []).find(x => x.navn === navn);
+  if (!a) return;
+  const grense = sisteResultat.tariff.norm * a.prosent / 100;
+  let rader = '';
+  for (const v of a.vakter || []) rader += `<tr><td>${esc(v.dato)}</td><td>${esc(v.skift)}</td><td>${esc(v.start)}–${esc(v.slutt)}</td><td>${v.timer}</td></tr>`;
+  let html = `<div class="modal-bakgrunn" onclick="lukkModal()"><div class="modal" onclick="event.stopPropagation()">
+    <button class="liten lukk" onclick="lukkModal()">Lukk</button>
+    <h3>${esc(a.navn)}</h3>
+    <p class="laster">${esc(a.yrkesgruppe)} · ${esc(a.modaliteter.join(', '))} · ${a.prosent} % stilling</p>
+    <p>Snitt <b>${a.snitt_uke} t</b>/uke (norm ${grense.toFixed(1)} t) · nattvakter: ${a.natt} · helgevakter: ${a.helg || 0} · totalt ${Math.round(a.timer)} t</p>
+    ${a.snitt_uke < grense - 0.5 ? `<div class="status ok">Ligger ${(grense - a.snitt_uke).toFixed(1)} t under normen per uke.</div>` : ''}
+    <table><tr><th>Dato</th><th>Skift</th><th>Tid</th><th>Timer</th></tr>${rader}</table>
+  </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function lukkModal() {
+  const m = document.querySelector('.modal-bakgrunn');
+  if (m) m.remove();
+}
+
+function visSammenligning() {
+  if (!forrigeResultat || !sisteResultat) return;
+  const el = document.getElementById('sammenligning');
+  if (!el) return;
+  const gammel = new Map(forrigeResultat.ansatte.map(a => [a.navn, a]));
+  const diff = (verdi, forrige) => {
+    const d = +(verdi - forrige).toFixed(1);
+    const farge = d > 0 ? 'var(--rød)' : d < 0 ? 'var(--grønn)' : 'var(--grå)';
+    return `${verdi} <span style="color:${farge};font-size:11px">${d > 0 ? '+' : ''}${d}</span>`;
+  };
+  let html = '<h3>Sammenligning med forrige forslag</h3><table><tr><th>Ansatt</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th><th>Helg</th></tr>';
+  for (const b of sisteResultat.ansatte) {
+    const a = gammel.get(b.navn);
+    if (!a) { html += `<tr><td>${esc(b.navn)}</td><td colspan="5">ny i dette forslaget</td></tr>`; continue; }
+    html += `<tr><td>${esc(b.navn)}</td><td>${diff(b.skift, a.skift)}</td><td>${diff(Math.round(b.timer), Math.round(a.timer))}</td><td>${diff(b.snitt_uke, a.snitt_uke)}</td><td>${diff(b.natt, a.natt)}</td><td>${diff(b.helg || 0, a.helg || 0)}</td></tr>`;
+  }
+  el.innerHTML = html + '</table>';
 }
 
 function visVaktbytte(d) {

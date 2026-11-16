@@ -3,6 +3,22 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.13 – Brukbarhet: ukekort, låste vakter, sammenligning og dekningsforslag
+
+- Fargekodete kompetanse-markører: modalitetene vises som korte badges (RX/CT/MR/UL/MG/IV)
+  ved navnet i vaktmatrisen
+- «X t under»-merknad i oransje i oppsummeringen for ansatte som ligger merkbart under
+  arbeidsuke-normen (norm × stillingsprosent)
+- Klikk på navnet i matrisen åpner ukekort per ansatt: alle vakter med klokkeslett,
+  timer per uke, natt-/helgetelling og tariffstatus
+- Manuell låsing av vakter i Generer-fanen: låste vakter fordeles først av generatoren,
+  ulovlige låste vakter avvises med begrunnelse (kompetanse, fravær, døgnhvile e.l.)
+- «Sammenlign med forrige» viser differanser per ansatt (skift, timer, snitt/uke, natt, helg)
+  mot forrige genererte forslag
+- Konkrete løsningsforslag per udekket krav (f.eks. «gi flere radiografer CT-kompetanse,
+  eller reduser bemanningen for CT på NATT»)
+- Skift-listen og versjonsnummeret lastes nå ved oppstart
+
 ## 2.12 – Nøyaktig planmotor (OR-Tools CP-SAT)
 
 - Ny «Motor»-velger i Generer-fanen: Rask (greedy) eller Nøyaktig (CP-SAT)

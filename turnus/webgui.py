@@ -35,6 +35,7 @@ def generer_json(
     rotasjon: bool = False,
     syklus_uker: int = 4,
     motor: str = "greedy",
+    laaste: list[dict] | None = None,
 ) -> dict:
     defs = skift_defs if skift_defs is not None else skift_lager.skift_defs_for(langvakter)
     bemanning_cfg = standard_bemanning(defs)
@@ -57,11 +58,12 @@ def generer_json(
         ansatte = bygg_ansatte(behov, defs)
         ansatte_kilde = "demo"
     rotasjon_arg = (syklus_uker * 7, len(defs)) if rotasjon and syklus_uker > 0 else None
+    laaste_par, laaste_avvist = _laaste_par(laaste, ansatte, defs, start, antall_dager)
     motor_brukt = "greedy"
     motor_status = ""
     motor_tid = None
     motor_merknad = ""
-    if motor == "cpsat" and not rotasjon_arg:
+    if motor == "cpsat" and not rotasjon_arg and not laaste_par:
         if not cpsat_tilgjengelig():
             motor_merknad = "ortools er ikke installert (pip3 install ortools) \u2013 bruker greedy."
         else:
@@ -76,8 +78,12 @@ def generer_json(
                 motor_merknad = "CP-SAT fant ingen gjennomf\u00f8rbar l\u00f8sning innen tidsbegrensningen \u2013 bruker greedy."
     elif motor == "cpsat" and rotasjon_arg:
         motor_merknad = "Rotasjonsrullering st\u00f8ttes forel\u00f8pig bare av greedy-motoren."
+    elif motor == "cpsat" and laaste_par:
+        motor_merknad = "L\u00e5ste vakter st\u00f8ttes forel\u00f8pig bare av greedy-motoren."
     if motor_brukt == "greedy":
-        plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg).generer()
+        plan = TurnusGenerator(
+            ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg, laaste_par
+        ).generer()
     global _siste_plan
     _siste_plan = {
         "tildelinger": plan.tildelinger,
@@ -96,6 +102,57 @@ def generer_json(
     return _resultat_fra_plan(
         plan, ansatte, behov, bemanning_cfg, start, antall_dager, defs,
         uke_time_norm, rotasjon_arg, ansatte_kilde, motor_info=motor_info,
+        laaste_avvist=laaste_avvist,
+    )
+
+
+def _laaste_par(laaste, ansatte, defs, start, antall_dager) -> tuple[list, list[str]]:
+    par: list[tuple[str, Skift]] = []
+    avvist: list[str] = []
+    med_navn = {a.navn: a for a in ansatte}
+    for l in laaste or []:
+        navn = str(l.get("navn", "")).strip()
+        dato_iso = str(l.get("dato", "")).strip()
+        skift_navn = str(l.get("skift", "")).strip()
+        try:
+            dato = date.fromisoformat(dato_iso)
+        except ValueError:
+            avvist.append(f"L\u00e5st vakt avvist: ugyldig dato '{dato_iso}'")
+            continue
+        if not (start <= dato < start + timedelta(days=antall_dager)):
+            avvist.append(f"L\u00e5st vakt avvist: {dato_iso} er utenfor perioden")
+            continue
+        ansatt = med_navn.get(navn)
+        skift_def = next((d for d in defs if d.navn == skift_navn), None)
+        if ansatt is None or skift_def is None:
+            avvist.append(f"L\u00e5st vakt avvist: ukjent ansatt '{navn}' eller skift '{skift_navn}'")
+            continue
+        kategori = "helg" if dato.weekday() >= 5 else "hverdag"
+        if kategori not in skift_def.dager:
+            avvist.append(
+                f"L\u00e5st vakt avvist: {skift_navn} g\u00e5r ikke p\u00e5 {dato_iso} "
+                f"({'helg' if kategori == 'helg' else 'ukedag'})"
+            )
+            continue
+        par.append((ansatt.id, Skift(dato, skift_def)))
+    return par, avvist
+
+
+def _dekningsforslag(kompetanse: str, skift_navn: str) -> str:
+    if kompetanse == "fagradiograf":
+        return (
+            "Legg til en fagradiograf med passende hovedmodalitet i Ansatte-fanen, "
+            "eller \u00f8k bemanningen for fagradiograf p\u00e5 dette skiftet."
+        )
+    if kompetanse in MODALITETER:
+        return (
+            f"Ingen tilgjengelig ansatt med {kompetanse}-kompetanse. Sjekk ferie/frav\u00e6r, "
+            f"gi flere radiografer {kompetanse}-kompetanse, eller reduser bemanningen "
+            f"for {kompetanse} p\u00e5 {skift_navn}."
+        )
+    return (
+        f"F\u00e6rre ansatte med kompetansen '{kompetanse}' er tilgjengelige enn behovet. "
+        f"Reduser bemanningen for {kompetanse} p\u00e5 {skift_navn}, eller sjekk ferie/frav\u00e6r."
     )
 
 
@@ -112,6 +169,7 @@ def _resultat_fra_plan(
     ansatte_kilde,
     udekket=None,
     motor_info=None,
+    laaste_avvist=None,
 ):
     if udekket is None:
         udekket = plan.udekket
@@ -186,6 +244,17 @@ def _resultat_fra_plan(
                 "timer": total_timer,
                 "snitt_uke": round(total_timer / (antall_dager / 7), 1),
                 "natt": sum(1 for s in skift_liste if s.type.er_natt),
+                "helg": sum(1 for s in skift_liste if s.dato.weekday() >= 5),
+                "vakter": [
+                    {
+                        "dato": s.dato.isoformat(),
+                        "skift": s.type.navn,
+                        "start": s.start.strftime("%H:%M"),
+                        "slutt": s.slutt.strftime("%H:%M"),
+                        "timer": round(s.varighet.total_seconds() / 3600, 1),
+                    }
+                    for s in skift_liste
+                ],
                 "uker": uke_rader,
                 **({"rotasjonsgruppe": (idx_a % rotasjon_arg[1]) + 1} if rotasjon_arg else {}),
             }
@@ -241,9 +310,15 @@ def _resultat_fra_plan(
             ],
         },
         "udekket": [
-            {"skift": s.etikett, "dato": s.dato.isoformat(), "kompetanse": k.kompetanse}
+            {
+                "skift": s.etikett,
+                "dato": s.dato.isoformat(),
+                "kompetanse": k.kompetanse,
+                "forslag": _dekningsforslag(k.kompetanse, s.etikett),
+            }
             for s, k in udekket
         ],
+        "laaste_feilet": list(getattr(plan, "laaste_feilet", [])) + list(laaste_avvist or []),
         "validering": feil,
         "ics": bygg_ics(plan.tildelinger, ansatte, defs, f"Turnusforslag {start.isoformat()}")
     }
@@ -432,6 +507,7 @@ class Handler(BaseHTTPRequestHandler):
                     start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm, skift_defs,
                     bool(data.get("rotasjon")), int(data.get("syklus_uker", 4) or 4),
                     str(data.get("motor", "greedy")),
+                    data.get("laaste"),
                 )
             elif self.path == "/api/skift":
                 data = json.loads(kropp)

@@ -22,6 +22,7 @@ FAGRA_MODALITET_STRAFF = 1.5
 class Plan:
     tildelinger: dict[str, list[Skift]]
     udekket: list[tuple[Skift, Krav]] = field(default_factory=list)
+    laaste_feilet: list[str] = field(default_factory=list)
 
 
 class TurnusGenerator:
@@ -35,6 +36,7 @@ class TurnusGenerator:
         langvakt_avtale: bool = True,
         uke_time_norm: float = 40.0,
         rotasjon: tuple[int, int] | None = None,
+        laaste: list[tuple[str, Skift]] | None = None,
     ):
         self.ansatte = ansatte
         self.behov = behov
@@ -52,10 +54,14 @@ class TurnusGenerator:
             }
         else:
             self._grupper = {}
+        self._laaste = laaste or []
         self._plan: dict[str, list[Skift]] = {a.id: [] for a in ansatte}
         self._udekket: list[tuple[Skift, Krav]] = []
+        self._laaste_feilet: list[str] = []
 
     def generer(self) -> Plan:
+        for ansatt_id, skift in self._laaste:
+            self._laas(ansatt_id, skift)
         for i in range(self.antall_dager):
             dato = self.start_dato + timedelta(days=i)
             kategori = "helg" if dato.weekday() >= 5 else "hverdag"
@@ -64,7 +70,35 @@ class TurnusGenerator:
                 for krav in self.behov.get(kategori, {}).get(skift_def.navn, []):
                     for _ in range(krav.antall):
                         self._fyll(skift, krav)
-        return Plan(dict(self._plan), list(self._udekket))
+        return Plan(dict(self._plan), list(self._udekket), list(self._laaste_feilet))
+
+    def _laas(self, ansatt_id: str, skift: Skift) -> None:
+        ansatt = next((a for a in self.ansatte if a.id == ansatt_id), None)
+        if ansatt is None:
+            self._laaste_feilet.append(
+                f"L\u00e5st vakt avvist: ukjent ansatt for {skift.type.navn} {skift.dato:%d.%m}"
+            )
+            return
+        kategori = "helg" if skift.dato.weekday() >= 5 else "hverdag"
+        krav_liste = self.behov.get(kategori, {}).get(skift.type.navn, [])
+        if not krav_liste or not any(k.kompetanse in ansatt.kompetanse for k in krav_liste):
+            self._laaste_feilet.append(
+                f"L\u00e5st vakt avvist: {ansatt.navn} har ikke kompetansen som trengs p\u00e5 "
+                f"{skift.type.navn} {skift.dato:%d.%m}"
+            )
+            return
+        if skift.dato in ansatt.utilgjengelige_dager:
+            self._laaste_feilet.append(
+                f"L\u00e5st vakt avvist: {ansatt.navn} er utilgjengelig {skift.dato:%d.%m}"
+            )
+            return
+        if not regler.kandidat_er_lovlig(ansatt, self._plan[ansatt.id], skift, self.langvakt_avtale):
+            self._laaste_feilet.append(
+                f"L\u00e5st vakt avvist: {ansatt.navn} kan ikke ha {skift.type.navn} {skift.dato:%d.%m} "
+                "innenfor aml-reglene (d\u00f8gnhvile, uketimer, ukeshvile eller natteserie)"
+            )
+            return
+        self._plan[ansatt.id].append(skift)
 
     def _fyll(self, skift: Skift, krav: Krav) -> None:
         kandidater = [
