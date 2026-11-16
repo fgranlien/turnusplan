@@ -69,6 +69,31 @@ td.c-k { background:#fdf1e0; color:#b26a00; font-weight:600; }
 td.c-n { background:#e3ecfa; color:#1c4d8f; font-weight:600; }
 td.c-m { background:#fdf6dd; color:#8a7500; font-weight:600; }
 td.ute { background:#f0f1f3; }
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  body, body.mork { --bg:#fff; --card:#fff; --tekst:#000; --grå:#555; --linje:#bbb; }
+  body { background:#fff; color:#000; }
+  header, .tabbar, button, .vaktbytte-boks { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .card { border: 0; border-radius: 0; padding: 0; margin: 0 0 14px; background: #fff; }
+  #tab-generer, #tab-ansatte, #tab-valider { display: none !important; }
+  #tab-turnus { display: block !important; }
+  .rull { overflow: visible; }
+  table.matrix { font-size: 9px; }
+  table.matrix td.navn { position: static; }
+  th, td { border-color: #999; }
+  td.c-d, td.c-k, td.c-n, td.c-m, td.ute, table.matrix td.sum, table.matrix td.navn {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  body.mork td.c-d { background:#e7f6ee; }
+  body.mork td.c-k { background:#fdf1e0; }
+  body.mork td.c-n { background:#e3ecfa; }
+  body.mork td.c-m { background:#fdf6dd; }
+  body.mork td.ute, body.mork table.matrix td.sum, body.mork table.matrix td.navn { background:#fff; }
+  .status { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tr { page-break-inside: avoid; }
+  h2, h3 { page-break-after: avoid; }
+}
 </style>
 </head>
 <body>
@@ -636,7 +661,7 @@ function visGenerert(d) {
   const b = d.bemanning;
   const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
   html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · ${d.uker.length} uker · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
-  html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><span class="laster">Importer i kalender eller Minarbeidsplan.</span></div>';
+  html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><button onclick="window.print()">Skriv ut / lagre som PDF</button><span class="laster">Importer i kalender eller Minarbeidsplan. Utskrift blir automatisk A4 landskap med kun turnusen.</span></div>';
   if (d.rotasjon && d.rotasjon.aktiv) {
     html += `<div class="status ok">Rotasjonsrullering aktiv: ${d.rotasjon.grupper} grupper roterer gjennom skiftene per ${d.rotasjon.syklus_uker}-ukers syklus. Personlige preferanser er deaktivert i rotasjonsmodus.</div>`;
   }
@@ -667,14 +692,14 @@ function visGenerert(d) {
 function visVaktbytte(d) {
   const navn = d.ansatte.map(a => `<option value="${esc(a.navn)}">${esc(a.navn)}</option>`).join('');
   const skift = Object.keys(d.bemanning).map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  return `<h3>Vaktbytte</h3><div class="rad">
+  return `<div class="vaktbytte-boks"><h3>Vaktbytte</h3><div class="rad">
     <label>Fra <select id="bytt-a">${navn}</select></label>
     <label>Til <select id="bytt-b">${navn}</select></label>
     <label>Dato <input type="date" id="bytt-dato" min="${esc(d.periode.start)}" max="${esc(d.periode.slutt)}" value="${esc(d.periode.start)}"></label>
     <label>Skift <select id="bytt-skift">${skift}</select></label>
     <button class="liten" onclick="gjennomforBytte()">Foreslå og sjekk bytte</button>
   </div><div id="bytt-status"></div>
-  <p class="laster">Har mottakeren en vakt samme dag byttes de to vaktene; ellers overtar mottakeren vakten. Byttet gjennomføres bare hvis døgnhvile, ukeshvile, uketimer, natteserier, kompetanse, fravær og dekning fortsatt er i orden.</p>`;
+  <p class="laster">Har mottakeren en vakt samme dag byttes de to vaktene; ellers overtar mottakeren vakten. Byttet gjennomføres bare hvis døgnhvile, ukeshvile, uketimer, natteserier, kompetanse, fravær og dekning fortsatt er i orden.</p></div>`;
 }
 
 async function gjennomforBytte() {

@@ -3,6 +3,15 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.11 – Utskrift og PDF
+
+- «Skriv ut / lagre som PDF»-knapp i Turnus-fanen
+- Utskriften formateres automatisk som A4 landskap med kun turnusen: meny,
+  knapper, skjemafelter og vaktbytte-boksen skjules
+- Vaktmatrisen beholder fargekodene (D/K/N/M) på utskrift, også i mørk modus
+  som tvinges tilbake til lyse farger
+- Rader og overskrifter deles ikke over sideskifter
+
 ## 2.10 – Vaktbytte mellom ansatte
 
 - Nytt «Vaktbytte»-kort i Turnus-fanen: velg «Fra», «Til», dato og skift

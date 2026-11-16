@@ -39,6 +39,8 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
+- **Skriv ut / lagre som PDF** i Turnus-fanen – A4 landskap med kun turnusen,
+  fargekoder bevart
 - **Vaktbytte mellom ansatte** i Turnus-fanen – bytte eller overtagelse av en
   vakt, kun gjennomført hvis alle aml-regler, kompetanse og dekning fortsatt
   stemmer
