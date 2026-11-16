@@ -3,6 +3,19 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.8 – Rotasjonsrullering
+
+- Ny «Rotasjonsrullering»-bryter i Generer-fanen med valgfri sykluslengde
+  (standard 4 uker)
+- Ansatte deles i like mange grupper som det er aktive skift; gruppe 1 starter
+  på første skift, gruppe 2 på neste osv., og gruppene roterer ett skift frem
+  for hver syklus
+- Rotasjonen planlegges dag for dag med alle aml-sjekker intakte (døgnhvile,
+  ukeshvile, uketimer, natteserier) – i motsetning til å kopiere ferdige
+  mønstre, som kan bryte døgnhvilen ved syklusgrenser
+- Personlige preferanser deaktiveres i rotasjonsmodus; rotasjonsgruppe vises i
+  oppsummeringstabellen
+
 ## 2.7 – Forvalg: lagre og last komplett oppsett
 
 - Nytt «Forvalg (lagret oppsett)»-kort i Generer-fanen

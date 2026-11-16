@@ -106,6 +106,11 @@ td.ute { background:#f0f1f3; }
         </select>
       </label>
     </div>
+    <div class="rad" style="margin-top:10px">
+      <label class="sjekk"><input type="checkbox" id="rotasjon"> Rotasjonsrullering</label>
+      <label>Syklus (uker) <input type="number" id="syklus" value="4" min="1" max="12" style="width:60px"></label>
+      <span class="laster">Ansatte deles i grupper som roterer gjennom skiftene per syklus; personlige preferanser deaktiveres i rotasjonsmodus.</span>
+    </div>
   </section>
   <section class="card">
     <h2>Forvalg (lagret oppsett)</h2>
@@ -509,7 +514,9 @@ async function generer() {
                             dager: +document.getElementById('dager').value,
                             skift: skiftListe,
                             bemanning: hentBemanning(),
-                            uke_time_norm: +document.getElementById('norm').value})});
+                            uke_time_norm: +document.getElementById('norm').value,
+                            rotasjon: document.getElementById('rotasjon').checked,
+                            syklus_uker: +document.getElementById('syklus').value || 4})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
     visGenerert(data);
@@ -625,10 +632,14 @@ function visGenerert(d) {
   const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
   html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · ${d.uker.length} uker · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
   html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><span class="laster">Importer i kalender eller Minarbeidsplan.</span></div>';
+  if (d.rotasjon && d.rotasjon.aktiv) {
+    html += `<div class="status ok">Rotasjonsrullering aktiv: ${d.rotasjon.grupper} grupper roterer gjennom skiftene per ${d.rotasjon.syklus_uker}-ukers syklus. Personlige preferanser er deaktivert i rotasjonsmodus.</div>`;
+  }
   html += visUkeMatrix(d);
   html += visTariff(d);
-  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th><th>iCal</th></tr>';
-  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td><td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
+  const rot = d.rotasjon && d.rotasjon.aktiv;
+  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th>' + (rot ? '<th>Gruppe</th>' : '') + '<th>iCal</th></tr>';
+  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td>${rot ? `<td>${a.rotasjonsgruppe || ''}</td>` : ''}<td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
   html += '</table>';
   if (d.preferanser.totalt) html += `<p>Preferanser innfridd: ${d.preferanser.innfridd} av ${d.preferanser.totalt}</p>`;
   if (d.udekket.length) {

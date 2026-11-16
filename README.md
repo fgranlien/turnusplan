@@ -39,6 +39,9 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
+- **Rotasjonsrullering**: del de ansatte i grupper som roterer gjennom
+  skiftene per 4-ukers syklus (valgfri lengde), planlagt dag for dag slik at
+  alle aml-regler overholdes ved syklusgrensene
 - Lagre hele oppsettet (skift, bemanning, arbeidsuke-norm og ansatte) som et
   **forvalg** under et eget navn, og last det tilbake senere – lagres i
   `forvalg.json`

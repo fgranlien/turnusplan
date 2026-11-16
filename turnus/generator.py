@@ -34,6 +34,7 @@ class TurnusGenerator:
         skift_defs: list[SkiftDef] | None = None,
         langvakt_avtale: bool = True,
         uke_time_norm: float = 40.0,
+        rotasjon: tuple[int, int] | None = None,
     ):
         self.ansatte = ansatte
         self.behov = behov
@@ -42,6 +43,15 @@ class TurnusGenerator:
         self.skift_defs = skift_defs if skift_defs is not None else STANDARD_SKIFT
         self.langvakt_avtale = langvakt_avtale
         self.uke_time_norm = uke_time_norm
+        self.rotasjon = rotasjon
+        if rotasjon is not None:
+            syklus, grupper = rotasjon
+            self._grupper = {
+                a.id: i % grupper
+                for i, a in enumerate(sorted(ansatte, key=lambda a: a.id))
+            }
+        else:
+            self._grupper = {}
         self._plan: dict[str, list[Skift]] = {a.id: [] for a in ansatte}
         self._udekket: list[tuple[Skift, Krav]] = []
 
@@ -73,6 +83,14 @@ class TurnusGenerator:
         beste = max(kandidater, key=lambda a: (self._score(a, skift, krav), a.id))
         self._plan[beste.id].append(skift)
 
+    def _preferanser(self, ansatt: Ansatt, dato: date) -> tuple[set[SkiftDef], set[SkiftDef]]:
+        if self.rotasjon is not None:
+            syklus, grupper = self.rotasjon
+            syklus_nr = (dato - self.start_dato).days // syklus
+            idx = (self._grupper[ansatt.id] + syklus_nr) % grupper
+            return {self.skift_defs[idx]}, set()
+        return ansatt.foretrekker, ansatt.unnga
+
     def _under_norm(self, ansatt: Ansatt, skift: Skift) -> bool:
         uker_brukt = (skift.dato - self.start_dato).days // 7 + 1
         timer = skift.varighet.total_seconds() / 3600 + sum(
@@ -85,9 +103,10 @@ class TurnusGenerator:
         s = 0.0
         if krav.kompetanse not in YRKESGRUPPER and "fagradiograf" in ansatt.kompetanse:
             s -= FAGRA_MODALITET_STRAFF
-        if self._matcher(ansatt.foretrekker, skift):
+        foretrekker, unnga = self._preferanser(ansatt, skift.dato)
+        if self._matcher(foretrekker, skift):
             s += PREF_BONUS
-        if self._matcher(ansatt.unnga, skift):
+        if self._matcher(unnga, skift):
             s -= UNNGA_STRAFF
         tildelt = self._plan[ansatt.id]
         s -= RETTFERDIGHET_VEKT * len(tildelt) / max(1, self._kapasitet(ansatt))

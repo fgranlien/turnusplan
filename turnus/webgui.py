@@ -30,6 +30,8 @@ def generer_json(
     bemanning: dict | None = None,
     uke_time_norm: float = 40.0,
     skift_defs: list[SkiftDef] | None = None,
+    rotasjon: bool = False,
+    syklus_uker: int = 4,
 ) -> dict:
     defs = skift_defs if skift_defs is not None else skift_lager.skift_defs_for(langvakter)
     bemanning_cfg = standard_bemanning(defs)
@@ -51,7 +53,8 @@ def generer_json(
     else:
         ansatte = bygg_ansatte(behov, defs)
         ansatte_kilde = "demo"
-    plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm).generer()
+    rotasjon_arg = (syklus_uker * 7, len(defs)) if rotasjon and syklus_uker > 0 else None
+    plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg).generer()
     med_id = {a.id: a for a in ansatte}
 
     uke_start = start - timedelta(days=start.weekday())
@@ -90,7 +93,7 @@ def generer_json(
         )
 
     ansatt_rader = []
-    for a in ansatte:
+    for idx_a, a in enumerate(ansatte):
         skift_liste = sorted(plan.tildelinger[a.id])
         skift_per_dag = {s.dato: s for s in skift_liste}
         uke_rader = []
@@ -122,6 +125,7 @@ def generer_json(
                 "snitt_uke": round(total_timer / (antall_dager / 7), 1),
                 "natt": sum(1 for s in skift_liste if s.type.er_natt),
                 "uker": uke_rader,
+                **({"rotasjonsgruppe": (idx_a % rotasjon_arg[1]) + 1} if rotasjon_arg else {}),
             }
         )
 
@@ -140,6 +144,8 @@ def generer_json(
 
     maks_var = max(d.varighet.total_seconds() / 3600 for d in defs)
     modus = "langvakter 12 t" if maks_var > 10 else "8-timers turnus"
+    if rotasjon_arg:
+        modus += f" (rotasjonsrullering: {rotasjon_arg[1]} grupper, {syklus_uker} ukers syklus)"
     resultat = {
         "modus": modus,
         "bemanning": bemanning_cfg,
@@ -148,6 +154,11 @@ def generer_json(
         "periode": {
             "start": start.isoformat(),
             "slutt": (start + timedelta(days=antall_dager - 1)).isoformat(),
+        },
+        "rotasjon": {
+            "aktiv": rotasjon_arg is not None,
+            "syklus_uker": syklus_uker,
+            "grupper": rotasjon_arg[1] if rotasjon_arg else 0,
         },
         "dager": dager,
         "ansatte": ansatt_rader,
@@ -272,7 +283,8 @@ class Handler(BaseHTTPRequestHandler):
                 norm = max(20.0, min(40.0, norm))
                 skift_defs = skift_lager.parse_liste(data["skift"]) if data.get("skift") else None
                 resultat = generer_json(
-                    start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm, skift_defs
+                    start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm, skift_defs,
+                    bool(data.get("rotasjon")), int(data.get("syklus_uker", 4) or 4),
                 )
             elif self.path == "/api/skift":
                 data = json.loads(kropp)
