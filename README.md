@@ -35,11 +35,14 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 
 - Generere turnusforslag (velg startdato, lengde og 8 t/12 t-modus)
 - Velge modaliteter og bemanning per skift, atskilt for hverdag og helg
+- Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
+  og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
+  for demopoolen
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
 
-Ansattpoolen dimensjoneres automatisk etter timer per uke og nattbehov.
-Fagradiografer prioriteres til fagradiograf-plassene og brukes som reserve for
-modalitetsplasser når radiografene tar slut.
+Uten `ansatte.json` dimensjoneres demopoolen automatisk etter timer per uke og
+nattbehov. Fagradiografer prioriteres til fagradiograf-plassene og brukes som
+reserve for modalitetsplasser når radiografene tar slut.
 
 ### Valider din eksisterende turnus (iCal fra Minarbeidsplan)
 

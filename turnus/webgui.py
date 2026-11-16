@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import regler
+from . import ansatte_lager, regler
 from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
 from .generator import TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
@@ -29,7 +29,13 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
                 "helg": max(0, min(12, int(verdier.get("helg", bemanning_cfg[komp]["helg"])))),
             }
     behov = bygg_behov(bemanning_cfg, defs)
-    ansatte = bygg_ansatte(behov, defs)
+    lagrede = ansatte_lager.les_lagrede()
+    if lagrede:
+        ansatte = lagrede
+        ansatte_kilde = "lagret"
+    else:
+        ansatte = bygg_ansatte(behov, defs)
+        ansatte_kilde = "demo"
     plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True).generer()
     med_id = {a.id: a for a in ansatte}
 
@@ -84,6 +90,7 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
         "modus": "langvakter 12 t" if langvakter else "tredelt turnus 8 t",
         "bemanning": bemanning_cfg,
         "antall_ansatte": len(ansatte),
+        "ansatte_kilde": ansatte_kilde,
         "periode": {
             "start": start.isoformat(),
             "slutt": (start + timedelta(days=antall_dager - 1)).isoformat(),
@@ -130,6 +137,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path in ("/", "/index.html"):
             self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+        elif self.path == "/api/ansatte":
+            lagrede = ansatte_lager.les_lagrede()
+            if lagrede:
+                kilde = "lagret"
+                rader = [ansatte_lager.til_rad(a) for a in lagrede]
+            else:
+                kilde = "demo"
+                defs = skift_defs_for(False)
+                pool = bygg_ansatte(bygg_behov(standard_bemanning(), defs), defs)
+                rader = [ansatte_lager.til_rad(a) for a in pool]
+            resultat = {"kilde": kilde, "modaliteter": MODALITETER, "ansatte": rader}
+            self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         else:
             self._send(404, b"ikke funnet", "text/plain; charset=utf-8")
 
@@ -142,6 +161,10 @@ class Handler(BaseHTTPRequestHandler):
                 start = date.fromisoformat(data["start"])
                 dager = max(1, min(int(data.get("dager", 14)), 84))
                 resultat = generer_json(start, dager, bool(data.get("langvakter")), data.get("bemanning"))
+            elif self.path == "/api/ansatte":
+                data = json.loads(kropp)
+                antall, advarsler = ansatte_lager.lagre(data)
+                resultat = {"ok": True, "antall": antall, "advarsler": advarsler}
             elif self.path.startswith("/api/valider"):
                 spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                 filnavn = spørring.get("filnavn", ["turnus.ics"])[0]

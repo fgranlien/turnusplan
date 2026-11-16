@@ -17,7 +17,7 @@ main { max-width:1000px; margin:0 auto; padding:16px 32px 48px; }
 .rad { display:flex; flex-wrap:wrap; gap:16px; align-items:end; }
 label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--grå); }
 label.sjekk { flex-direction:row; align-items:center; gap:8px; padding-bottom:10px; }
-input[type=date], input[type=number] { padding:8px 10px; border:1px solid var(--linje); border-radius:8px; font-size:14px; }
+input[type=date], input[type=number], input[type=text], select { padding:8px 10px; border:1px solid var(--linje); border-radius:8px; font-size:14px; background:#fff; color:var(--tekst); }
 button { background:var(--blå); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; }
 button:disabled { opacity:.5; cursor:default; }
 table { border-collapse:collapse; width:100%; font-size:13.5px; margin-top:8px; }
@@ -50,6 +50,17 @@ p { font-size:14px; }
     <h3>Bemanning og modaliteter</h3>
     <div id="bemanning"></div>
     <p class="laster">Velg hvilke modaliteter avdelingen dekker, og hvor mange personer per skift som trengs med hver kompetanse. Hverdag = man–fre, helg = lør–søn. Antall ansatte beregnes automatisk; fagradiografer kan dekke alle modaliteter.</p>
+  </section>
+  <section class="card">
+    <h2>Ansatte</h2>
+    <p class="laster" id="ansatte-kilde"></p>
+    <div id="ansatte-tabell"></div>
+    <div class="rad" style="margin-top:14px">
+      <button onclick="leggTilAnsatt()">+ Legg til ansatt</button>
+      <button id="lagre-ansatte-knapp" onclick="lagreAnsatte()">Lagre ansatte</button>
+    </div>
+    <div id="ansatte-status"></div>
+    <p class="laster">Radiografer må ha minst én modalitet. Fagradiografer kan dekke alle modaliteter automatisk. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
   </section>
   <section class="card">
     <h2>Valider eksisterende turnus (iCal fra Minarbeidsplan)</h2>
@@ -119,6 +130,106 @@ function hentBemanning() {
 
 renderBemanning();
 
+let ansatteListe = [];
+let ansatteKilde = 'demo';
+const PREF_ALTERNATIVER = [['DAG', 'Dag'], ['KVELD', 'Kveld'], ['NATT', 'Natt']];
+
+async function lastAnsatte() {
+  try {
+    const r = await fetch('/api/ansatte');
+    const d = await r.json();
+    ansatteKilde = d.kilde;
+    ansatteListe = d.ansatte.map(a => ({...a, modaliteter: [...a.modaliteter], foretrekker: [...a.foretrekker], unnga: [...a.unnga], utilgjengelige_dager: [...a.utilgjengelige_dager]}));
+    document.getElementById('ansatte-kilde').textContent = d.kilde === 'lagret'
+      ? 'Redigerer lagret ansattliste (ansatte.json).'
+      : 'Viser demopool – rediger og lagre for å bruke egne ansatte i stedet.';
+    renderAnsatte();
+  } catch (e) {
+    document.getElementById('ansatte-status').innerHTML = `<div class="status brudd">Kunne ikke laste ansatte: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderAnsatte() {
+  let html = '<table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Stilling %</th><th>Foretrekker</th><th>Unngå</th><th></th></tr>';
+  ansatteListe.forEach((a, i) => {
+    const fagra = a.yrkesgruppe === 'fagradiograf';
+    let modHtml;
+    if (fagra) {
+      modHtml = '<span class="laster">alle modaliteter</span>';
+    } else {
+      modHtml = MODALITETER.map(m =>
+        `<label class="sjekk" style="padding:0;gap:4px;margin-right:10px;font-size:12.5px"><input type="checkbox" ${a.modaliteter.includes(m) ? 'checked' : ''} onchange="settMod(${i}, '${m}', this.checked)"> ${m}</label>`
+      ).join('');
+    }
+    const prefSel = (felt) => {
+      const valg = a[felt][0] || '';
+      return `<select onchange="settPref(${i}, '${felt}', this.value)">` +
+        '<option value="">–</option>' +
+        PREF_ALTERNATIVER.map(([v, t]) => `<option value="${v}" ${valg === v ? 'selected' : ''}>${t}</option>`).join('') +
+        '</select>';
+    };
+    html += `<tr>` +
+      `<td><input type="text" value="${esc(a.navn)}" style="width:110px" oninput="settFelt(${i}, 'navn', this.value)"></td>` +
+      `<td><select onchange="settGruppe(${i}, this.value)">` +
+        `<option value="radiograf" ${!fagra ? 'selected' : ''}>Radiograf</option>` +
+        `<option value="fagradiograf" ${fagra ? 'selected' : ''}>Fagradiograf</option>` +
+      `</select></td>` +
+      `<td>${modHtml}</td>` +
+      `<td><input type="number" min="10" max="100" value="${a.stillingsprosent}" style="width:64px" oninput="settFelt(${i}, 'stillingsprosent', +this.value)"></td>` +
+      `<td>${prefSel('foretrekker')}</td>` +
+      `<td>${prefSel('unnga')}</td>` +
+      `<td><button style="background:var(--grå);padding:6px 10px;font-size:12.5px" onclick="fjernAnsatt(${i})">Fjern</button></td>` +
+      `</tr>`;
+  });
+  document.getElementById('ansatte-tabell').innerHTML = html + '</table>';
+}
+
+function settFelt(i, felt, verdi) { ansatteListe[i][felt] = verdi; }
+
+function settMod(i, m, valgt) {
+  const s = new Set(ansatteListe[i].modaliteter);
+  valgt ? s.add(m) : s.delete(m);
+  ansatteListe[i].modaliteter = [...s];
+}
+
+function settGruppe(i, gruppe) {
+  ansatteListe[i].yrkesgruppe = gruppe;
+  if (gruppe === 'fagradiograf') ansatteListe[i].modaliteter = MODALITETER.slice();
+  renderAnsatte();
+}
+
+function settPref(i, felt, verdi) { ansatteListe[i][felt] = verdi ? [verdi] : []; }
+
+function leggTilAnsatt() {
+  ansatteListe.push({id: '', navn: 'Ny ansatt', yrkesgruppe: 'radiograf', modaliteter: ['Røntgen'], stillingsprosent: 100, foretrekker: [], unnga: [], utilgjengelige_dager: []});
+  renderAnsatte();
+}
+
+function fjernAnsatt(i) {
+  ansatteListe.splice(i, 1);
+  renderAnsatte();
+}
+
+async function lagreAnsatte() {
+  const knapp = document.getElementById('lagre-ansatte-knapp');
+  knapp.disabled = true; knapp.textContent = 'Lagrer …';
+  const statusEl = document.getElementById('ansatte-status');
+  try {
+    const r = await fetch('/api/ansatte', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(ansatteListe)});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.feil || r.status);
+    let html = `<div class="status ok">✓ Lagret ${d.antall} ansatte til ansatte.json. Generatoren bruker nå denne listen.</div>`;
+    for (const a of d.advarsler || []) html += `<p class="laster">• ${esc(a)}</p>`;
+    statusEl.innerHTML = html;
+    await lastAnsatte();
+  } catch (e) {
+    statusEl.innerHTML = `<div class="status brudd">Kunne ikke lagre: ${esc(e.message)}</div>`;
+  }
+  knapp.disabled = false; knapp.textContent = 'Lagre ansatte';
+}
+
+lastAnsatte();
+
 async function generer() {
   const knapp = document.getElementById('generer-knapp');
   knapp.disabled = true; knapp.textContent = 'Genererer …';
@@ -141,7 +252,7 @@ function visGenerert(d) {
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
   const b = d.bemanning;
   const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
-  html += `<p class="laster">${d.antall_ansatte} ansatte · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
+  html += `<p class="laster">${d.antall_ansatte} ansatte (${d.ansatte_kilde === 'lagret' ? 'lagret liste' : 'demopool'}) · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
   html += '<table><tr><th>Dag</th><th>Skift</th><th>Bemanning</th></tr>';
   for (const dag of d.dager) for (const skift of dag.skift) {
     const navn = skift.bemanning.map(p => `<span class="pill ${esc(p.yrkesgruppe)}" title="${esc(p.modaliteter.join(', '))}">${esc(p.navn)}</span>`).join('');
