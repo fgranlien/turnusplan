@@ -19,6 +19,18 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 ./run.sh --start 2025-04-01 --dager 21 --langvakter
 ```
 
+### Grafisk grensesnitt (GUI)
+
+```bash
+./run.sh --gui
+```
+
+Åpner et grafisk grensesnitt i nettleseren din (serveren kjører kun lokalt på
+127.0.0.1, ingenting eksponeres mot nettet). Fra GUI-et kan du:
+
+- Generere turnusforslag (velg startdato, lengde og 8 t/12 t-modus)
+- Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
+
 ### Valider din eksisterende turnus (iCal fra Minarbeidsplan)
 
 ```bash
@@ -69,8 +81,12 @@ turnus/
   modeller.py    Ansatt, SkiftDef (konfigurerbare skifftyper), Skift, Krav
   regler.py      Harde regler fra aml + full planvalidering
   generator.py   Greedy-planlegger med poengberegning
+  ics_import.py  Import av iCal (.ics) og validering av eksisterende turnus
+  webgui.py      Lokal webserver (127.0.0.1) med JSON-API for GUI-et
   demo_data.py   Eksempel: 23 ansatte, 3 kompetanser, behov for 8 t- og 12 t-modus
-main.py          CLI (argparse) som genererer og skriver ut rapport
+web/
+  index.html     Grensesnitt (vanilla HTML/JS, ingen avhengigheter)
+main.py          CLI (argparse) som genererer, validerer eller starter GUI
 run.sh           Kjøre-skript for Mac/Linux
 ```
 

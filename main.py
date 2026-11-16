@@ -62,9 +62,16 @@ def main() -> None:
     parser.add_argument("--start", default="2025-03-03", help="Startdato (ÅÅÅÅ-MM-DD, må være mandag)")
     parser.add_argument("--dager", type=int, default=14, help="Antall dager i horisonten")
     parser.add_argument("--langvakter", action="store_true", help="Bruk 12-timers langvakter (dag 07-19, natt 19-07)")
+    parser.add_argument("--gui", action="store_true", help="Start grafisk grensesnitt i nettleseren")
     parser.add_argument("--valider-fil", metavar="FIL.ICS", help="Valider en eksisterende turnus i iCal-format i stedet for å generere")
     parser.add_argument("--stillingsprosent", type=float, default=100.0, help="Stillingsprosent for validering (standard 100)")
     args = parser.parse_args()
+
+    if args.gui:
+        from turnus.webgui import start
+
+        start()
+        return
 
     if args.valider_fil:
         valider_ics_fil(args.valider_fil, args.stillingsprosent)

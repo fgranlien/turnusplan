@@ -35,7 +35,10 @@ def _felt(blokk: str, navn: str) -> str | None:
 
 def les_ics(sti: str) -> tuple[list[Vakt], list[str]]:
     with open(sti, encoding="utf-8-sig") as f:
-        tekst = f.read()
+        return les_ics_tekst(f.read())
+
+
+def les_ics_tekst(tekst: str) -> tuple[list[Vakt], list[str]]:
     tekst = tekst.replace("\r\n ", "").replace("\n ", "")
 
     vakter: list[Vakt] = []
