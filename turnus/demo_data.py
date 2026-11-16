@@ -4,91 +4,114 @@ import math
 
 from .modeller import Ansatt, KVELD, Krav, NATT, SkiftDef
 
-KOMPETANSE_ANDLER = [("leder", 0.25), ("sykepleier", 0.25), ("assistent", 0.5)]
+MODALITETER = ["Røntgen", "CT", "MR", "Ultralyd", "Mammografi", "Intervensjon"]
+YRKESGRUPPER = ("radiograf", "fagradiograf")
 
 NAVN = {
-    "leder": ["Anne", "Bjørn", "Cecilie", "David", "Eva", "Fredrik", "Geir", "Hanna", "Ivar", "Jenny", "Karl", "Lene", "Mons", "Nora", "Odd"],
-    "sykepleier": ["Greta", "Henrik", "Ingrid", "Jonas", "Karin", "Lars", "Marte", "Nils", "Oda", "Per", "Ragnhild", "Stian", "Tiril", "Una", "Vera"],
-    "assistent": ["Nina", "Ola", "Petra", "Rune", "Sofia", "Thomas", "Ulrik", "Vilde", "Aksel", "Birgitte", "Even", "Frida", "Gard", "Hege", "Jens"],
+    "radiograf": ["Ola", "Nina", "Petra", "Rune", "Sofia", "Thomas", "Ulrik", "Vilde", "Aksel", "Birgitte", "Even", "Frida", "Gard", "Hege", "Jens"],
+    "fagradiograf": ["Anne", "Bjørn", "Cecilie", "David", "Eva", "Fredrik", "Geir", "Hanna", "Ivar", "Jenny"],
+}
+
+STANDARD_BEMANNING = {
+    "fagradiograf": {"hverdag": 1, "helg": 1},
+    "Røntgen": {"hverdag": 2, "helg": 1},
+    "CT": {"hverdag": 1, "helg": 1},
+    "MR": {"hverdag": 1, "helg": 1},
 }
 
 
-def fordel_bemanning(total: int) -> list[Krav]:
-    if total <= 0:
-        return []
-    if total == 1:
-        return [Krav("leder", 1)]
-    if total == 2:
-        return [Krav("leder", 1), Krav("sykepleier", 1)]
-    leder = max(1, round(total * 0.25))
-    sykepleier = max(1, round(total * 0.25))
-    assistent = max(1, total - leder - sykepleier)
-    return [Krav("leder", leder), Krav("sykepleier", sykepleier), Krav("assistent", assistent)]
-
-
 def bygg_behov(
-    bemanning_hverdag: dict[str, int],
-    bemanning_helg: dict[str, int],
+    bemanning: dict[str, dict[str, int]],
+    skift_defs: list[SkiftDef],
 ) -> dict[str, dict[str, list[Krav]]]:
+    rekkefolge = ["fagradiograf"] + [k for k in bemanning if k != "fagradiograf"]
     behov: dict[str, dict[str, list[Krav]]] = {}
-    for kategori, bemanning in (("hverdag", bemanning_hverdag), ("helg", bemanning_helg)):
-        behov[kategori] = {
-            skift: fordel_bemanning(antall) for skift, antall in bemanning.items() if antall > 0
-        }
+    for kategori in ("hverdag", "helg"):
+        rad: dict[str, list[Krav]] = {}
+        for skift_def in skift_defs:
+            krav = [Krav(komp, int(bemanning.get(komp, {}).get(kategori, 0))) for komp in rekkefolge]
+            krav = [k for k in krav if k.antall > 0]
+            if krav:
+                rad[skift_def.navn] = krav
+        behov[kategori] = rad
     return behov
 
 
-def uketlig_ettersporsel(behov: dict[str, dict[str, list[Krav]]]) -> dict[str, int]:
-    ettersporsel: dict[str, int] = {}
-    for kategori, dager_i_kategori in (("hverdag", 5), ("helg", 2)):
-        for krav_liste in behov[kategori].values():
-            for krav in krav_liste:
-                ettersporsel[krav.kompetanse] = ettersporsel.get(krav.kompetanse, 0) + krav.antall * dager_i_kategori
-    return ettersporsel
-
-
-def bygg_ansatte(behov: dict[str, dict[str, list[Krav]]], skift_defs: list[SkiftDef]) -> list[Ansatt]:
+def ettersporsel_per_kompetanse(
+    behov: dict[str, dict[str, list[Krav]]],
+    skift_defs: list[SkiftDef],
+) -> tuple[dict[str, float], dict[str, float]]:
     defs_med_navn = {d.navn: d for d in skift_defs}
-    timer_ettersporsel: dict[str, float] = {}
-    natt_ettersporsel: dict[str, float] = {}
+    timer: dict[str, float] = {}
+    natt: dict[str, float] = {}
     for kategori, dager_i_kategori in (("hverdag", 5), ("helg", 2)):
         for skift_navn, krav_liste in behov[kategori].items():
             skift_def = defs_med_navn[skift_navn]
             varighet = skift_def.varighet.total_seconds() / 3600
             for krav in krav_liste:
-                timer_ettersporsel[krav.kompetanse] = timer_ettersporsel.get(krav.kompetanse, 0) + krav.antall * dager_i_kategori * varighet
+                timer[krav.kompetanse] = timer.get(krav.kompetanse, 0) + krav.antall * dager_i_kategori * varighet
                 if skift_def.er_natt:
-                    natt_ettersporsel[krav.kompetanse] = natt_ettersporsel.get(krav.kompetanse, 0) + krav.antall * dager_i_kategori
+                    natt[krav.kompetanse] = natt.get(krav.kompetanse, 0) + krav.antall * dager_i_kategori
+    return timer, natt
+
+
+def _pool_storrelse(timer_per_uke: float, natt_per_uke: float, skift_defs: list[SkiftDef]) -> int:
+    natt_varighet = max(
+        (d.varighet.total_seconds() / 3600 for d in skift_defs if d.er_natt),
+        default=8.0,
+    )
+    maks_natt_per_ansatt = max(2, int(36 // natt_varighet))
+    return max(
+        math.ceil(timer_per_uke / 32) + 1,
+        math.ceil(natt_per_uke / (0.75 * maks_natt_per_ansatt)) + 1,
+        1,
+    )
+
+
+def bygg_ansatte(behov: dict[str, dict[str, list[Krav]]], skift_defs: list[SkiftDef]) -> list[Ansatt]:
+    timer, natt = ettersporsel_per_kompetanse(behov, skift_defs)
+    aktive_modaliteter = sorted(k for k in timer if k in MODALITETER)
 
     ansatte: list[Ansatt] = []
+    brukte_navn: set[str] = set()
     id_teller = 1
-    for kompetanse in sorted(timer_ettersporsel):
-        timer_per_uke = timer_ettersporsel[kompetanse]
-        natt_behov_per_uke = natt_ettersporsel.get(kompetanse, 0.0)
-        natt_varighet = max(
-            (d.varighet.total_seconds() / 3600 for d in skift_defs if d.er_natt),
-            default=8,
-        )
-        maks_natt_per_ansatt = max(2, int(36 // natt_varighet))
-        antall = max(
-            math.ceil(timer_per_uke / 32) + 1,
-            math.ceil(natt_behov_per_uke / (0.75 * maks_natt_per_ansatt)) + 1,
-            1,
-        )
-        navneliste = NAVN[kompetanse]
-        for i in range(antall):
-            navn = navneliste[i % len(navneliste)]
-            if i >= len(navneliste):
-                navn += f" {i // len(navneliste) + 1}"
-            ansatt = Ansatt(f"a{id_teller}", navn, {kompetanse})
-            if i % 4 == 0:
+
+    def unikt_navn(gruppe: str) -> str:
+        base = NAVN[gruppe][id_teller % len(NAVN[gruppe])]
+        navn = base
+        tall = 2
+        while navn in brukte_navn:
+            navn = f"{base} {tall}"
+            tall += 1
+        brukte_navn.add(navn)
+        return navn
+
+    for modality in aktive_modaliteter:
+        antall = _pool_storrelse(timer[modality], natt.get(modality, 0.0), skift_defs)
+        for _ in range(antall):
+            ansatt = Ansatt(f"a{id_teller}", unikt_navn("radiograf"), {"radiograf", modality})
+            if id_teller % 4 == 0:
                 ansatt.unnga = {NATT}
-            elif i % 4 == 2:
+            elif id_teller % 4 == 2:
                 ansatt.foretrekker = {NATT}
-            elif i % 4 == 3:
+            elif id_teller % 4 == 3:
                 ansatt.foretrekker = {KVELD}
             ansatte.append(ansatt)
             id_teller += 1
+
+    if timer.get("fagradiograf", 0) > 0:
+        antall = _pool_storrelse(timer["fagradiograf"], natt.get("fagradiograf", 0.0), skift_defs)
+        for _ in range(antall):
+            ansatt = Ansatt(f"a{id_teller}", unikt_navn("fagradiograf"), {"fagradiograf", *aktive_modaliteter})
+            if id_teller % 4 == 0:
+                ansatt.unnga = {NATT}
+            elif id_teller % 4 == 2:
+                ansatt.foretrekker = {NATT}
+            elif id_teller % 4 == 3:
+                ansatt.foretrekker = {KVELD}
+            ansatte.append(ansatt)
+            id_teller += 1
+
     return ansatte
 
 
@@ -98,8 +121,5 @@ def skift_defs_for(langvakter: bool) -> list[SkiftDef]:
     return LANGVAKT_SKIFT if langvakter else STANDARD_SKIFT
 
 
-def standard_bemanning(langvakter: bool) -> tuple[dict[str, int], dict[str, int]]:
-    from .modeller import LANGVAKT_SKIFT, STANDARD_SKIFT
-
-    navn = [d.navn for d in (LANGVAKT_SKIFT if langvakter else STANDARD_SKIFT)]
-    return ({n: 4 for n in navn}, {n: 3 for n in navn})
+def standard_bemanning() -> dict[str, dict[str, int]]:
+    return {komp: dict(verdier) for komp, verdier in STANDARD_BEMANNING.items()}

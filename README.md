@@ -1,10 +1,15 @@
 # Turnusplan
 
-Prototype som genererer turnusforslag basert på:
+Prototype for en radiologisk avdeling som genererer turnusforslag basert på:
 
 - **Arbeidsmiljøloven kap. 10** som harde begrensninger
 - **Ansattes preferanser og fridager** som myke vektinger
-- **Kompetansebehov** per skift som dekningskrav
+- **Modalitetskompetanse** per skift som dekningskrav (Røntgen, CT, MR, Ultralyd, Mammografi, Intervensjon)
+- **To yrkesgrupper**: radiograf (én modalitet) og fagradiograf (alle modaliteter, kan dekke alle plasser)
+- **Bemanning atskilt for hverdag (man–fre) og helg (lør–søn)**
+
+Ledere er ikke med i turnusen (de jobber dagtid). Antall ansatte beregnes
+automatisk ut fra bemanningsbehovet.
 
 Støtter både **tredelt turnus** (dag/kveld/natt, 8 t) og **langvakter** (12 t).
 
@@ -29,20 +34,12 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 127.0.0.1, ingenting eksponeres mot nettet). Fra GUI-et kan du:
 
 - Generere turnusforslag (velg startdato, lengde og 8 t/12 t-modus)
-- Stille inn bemanning per skift, atskilt for hverdag (man–fre) og helg (lør–søn)
+- Velge modaliteter og bemanning per skift, atskilt for hverdag og helg
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
 
-Antall ansatte beregnes automatisk ut fra bemanningsbehovet (dimensjonert etter
-timer per uke og nattbehov), og fordelingen mellom leder/sykepleier/assistent
-skalerer med bemanningen (ca. 25/25/50 %, alltid minst én leder og én
-sykepleier per skift).
-
-I kommandolinjen styres bemanningen slik:
-
-```bash
-python3 main.py --bemanning-hverdag 6 --bemanning-helg 3 --dager 28
-python3 main.py --langvakter --bemanning-hverdag 5 --bemanning-helg 3
-```
+Ansattpoolen dimensjoneres automatisk etter timer per uke og nattbehov.
+Fagradiografer prioriteres til fagradiograf-plassene og brukes som reserve for
+modalitetsplasser når radiografene tar slut.
 
 ### Valider din eksisterende turnus (iCal fra Minarbeidsplan)
 
@@ -96,7 +93,7 @@ turnus/
   generator.py   Greedy-planlegger med poengberegning
   ics_import.py  Import av iCal (.ics) og validering av eksisterende turnus
   webgui.py      Lokal webserver (127.0.0.1) med JSON-API for GUI-et
-  demo_data.py   Eksempel: 23 ansatte, 3 kompetanser, behov for 8 t- og 12 t-modus
+  demo_data.py   Modaliteter, yrkesgrupper og automatisk ansattdimensjonering
 web/
   index.html     Grensesnitt (vanilla HTML/JS, ingen avhengigheter)
 main.py          CLI (argparse) som genererer, validerer eller starter GUI

@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import regler
-from .demo_data import bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
+from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
 from .generator import TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
 from .modeller import Skift
@@ -21,11 +21,14 @@ UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
 
 def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: dict | None = None) -> dict:
     defs = skift_defs_for(langvakter)
-    standard_hverdag, standard_helg = standard_bemanning(langvakter)
-    bemanning = bemanning or {}
-    hverdag = {d.navn: int(bemanning.get("hverdag", {}).get(d.navn, standard_hverdag[d.navn])) for d in defs}
-    helg = {d.navn: int(bemanning.get("helg", {}).get(d.navn, standard_helg[d.navn])) for d in defs}
-    behov = bygg_behov(hverdag, helg)
+    bemanning_cfg = standard_bemanning()
+    for komp, verdier in (bemanning or {}).items():
+        if komp in bemanning_cfg:
+            bemanning_cfg[komp] = {
+                "hverdag": max(0, min(12, int(verdier.get("hverdag", bemanning_cfg[komp]["hverdag"])))),
+                "helg": max(0, min(12, int(verdier.get("helg", bemanning_cfg[komp]["helg"])))),
+            }
+    behov = bygg_behov(bemanning_cfg, defs)
     ansatte = bygg_ansatte(behov, defs)
     plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True).generer()
     med_id = {a.id: a for a in ansatte}
@@ -37,7 +40,11 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
         for skift_def in defs:
             skift = Skift(dato, skift_def)
             bemanning = [
-                {"navn": med_id[a_id].navn, "kompetanse": sorted(med_id[a_id].kompetanse)[0]}
+                {
+                    "navn": med_id[a_id].navn,
+                    "yrkesgruppe": "fagradiograf" if "fagradiograf" in med_id[a_id].kompetanse else "radiograf",
+                    "modaliteter": sorted(med_id[a_id].kompetanse & set(MODALITETER)),
+                }
                 for a_id, skift_liste in plan.tildelinger.items()
                 if skift in skift_liste
             ]
@@ -53,7 +60,8 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
         ansatt_rader.append(
             {
                 "navn": a.navn,
-                "kompetanse": sorted(a.kompetanse)[0],
+                "yrkesgruppe": "fagradiograf" if "fagradiograf" in a.kompetanse else "radiograf",
+                "modaliteter": sorted(a.kompetanse & set(MODALITETER)),
                 "prosent": a.stillingsprosent,
                 "skift": len(skift_liste),
                 "timer": sum(s.varighet.total_seconds() / 3600 for s in skift_liste),
@@ -74,7 +82,7 @@ def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: di
 
     return {
         "modus": "langvakter 12 t" if langvakter else "tredelt turnus 8 t",
-        "bemanning": {"hverdag": hverdag, "helg": helg},
+        "bemanning": bemanning_cfg,
         "antall_ansatte": len(ansatte),
         "periode": {
             "start": start.isoformat(),

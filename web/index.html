@@ -25,9 +25,8 @@ th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--linje)
 th { color:var(--grå); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
 td.skift-navn { font-weight:600; white-space:nowrap; }
 .pill { display:inline-block; border-radius:20px; padding:2px 10px; margin:2px 4px 2px 0; font-size:12.5px; background:#eef3fb; color:var(--blå); }
-.pill.leder { background:#f3ecfd; color:#6b34c1; }
-.pill.sykepleier { background:#e7f6ee; color:var(--grønn); }
-.pill.assistent { background:#fdf1e3; color:#a05a12; }
+.pill.fagradiograf { background:#f3ecfd; color:#6b34c1; }
+.pill.radiograf { background:#e7f6ee; color:var(--grønn); }
 .status { margin-top:14px; padding:12px 16px; border-radius:8px; font-size:14px; }
 .status.ok { background:#e7f6ee; color:var(--grønn); }
 .status.brudd { background:#fdecea; color:var(--rød); }
@@ -48,9 +47,9 @@ p { font-size:14px; }
       <label class="sjekk"><input type="checkbox" id="langvakter" onchange="renderBemanning()"> 12-timers langvakter</label>
       <button id="generer-knapp" onclick="generer()">Generer forslag</button>
     </div>
-    <h3>Bemanning per skift</h3>
+    <h3>Bemanning og modaliteter</h3>
     <div id="bemanning"></div>
-    <p class="laster">Antall personer per skift. Hverdag = man–fre, helg = lør–søn. Fordelingen mellom kompetanser (leder/sykepleier/assistent) skalerer automatisk, og antall ansatte beregnes ut fra behovet.</p>
+    <p class="laster">Velg hvilke modaliteter avdelingen dekker, og hvor mange personer per skift som trengs med hver kompetanse. Hverdag = man–fre, helg = lør–søn. Antall ansatte beregnes automatisk; fagradiografer kan dekke alle modaliteter.</p>
   </section>
   <section class="card">
     <h2>Valider eksisterende turnus (iCal fra Minarbeidsplan)</h2>
@@ -65,23 +64,57 @@ p { font-size:14px; }
 <script>
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-function skiftNavn() {
-  return document.getElementById('langvakter').checked ? ['DAG12', 'NATT12'] : ['DAG', 'KVELD', 'NATT'];
-}
+const MODALITETER = [
+  {navn: 'Røntgen', standard: [2, 1]},
+  {navn: 'CT', standard: [1, 1]},
+  {navn: 'MR', standard: [1, 1]},
+  {navn: 'Ultralyd', standard: [1, 0]},
+  {navn: 'Mammografi', standard: [1, 0]},
+  {navn: 'Intervensjon', standard: [1, 1]},
+];
+const standardValgte = ['Røntgen', 'CT', 'MR'];
+let bemanningVerdier = {};
 
 function renderBemanning() {
-  let html = '<table><tr><th>Skift</th><th>Hverdag (man–fre)</th><th>Helg (lør–søn)</th></tr>';
-  for (const s of skiftNavn()) {
-    html += `<tr><td class="skift-navn">${s}</td>` +
-      `<td><input type="number" id="bem-${s}-hverdag" value="4" min="1" max="12"></td>` +
-      `<td><input type="number" id="bem-${s}-helg" value="3" min="1" max="12"></td></tr>`;
+  let html = '<p style="margin:0 0 8px;font-size:13px;color:var(--grå)">Modaliteter avdelingen dekker:</p><div class="rad" style="margin-bottom:12px">';
+  for (const m of MODALITETER) {
+    const valgt = standardValgte.includes(m.navn);
+    html += `<label class="sjekk"><input type="checkbox" class="mod-check" value="${m.navn}" ${valgt ? 'checked' : ''} onchange="renderBemanningTabell()"> ${m.navn}</label>`;
   }
-  document.getElementById('bemanning').innerHTML = html + '</table>';
+  html += '</div><div id="bemanning-tabell"></div>';
+  document.getElementById('bemanning').innerHTML = html;
+  renderBemanningTabell();
+}
+
+function bemVerdi(navn, kat, standard) {
+  if (bemanningVerdier[`${navn}-${kat}`] === undefined) bemanningVerdier[`${navn}-${kat}`] = standard;
+  return bemanningVerdier[`${navn}-${kat}`];
+}
+
+function renderBemanningTabell() {
+  const aktive = [...document.querySelectorAll('.mod-check:checked')].map(c => c.value);
+  const rader = [{navn: 'Fagradiograf', standard: [1, 1]}]
+    .concat(MODALITETER.filter(m => aktive.includes(m.navn)));
+  let html = '<table><tr><th>Kompetanse per skift</th><th>Hverdag (man–fre)</th><th>Helg (lør–søn)</th></tr>';
+  for (const r of rader) {
+    const h = bemVerdi(r.navn, 'hverdag', r.standard[0]);
+    const l = bemVerdi(r.navn, 'helg', r.standard[1]);
+    html += `<tr><td class="skift-navn">${esc(r.navn)}</td>` +
+      `<td><input type="number" min="0" max="12" value="${h}" oninput="bemanningVerdier['${r.navn}-hverdag']=+this.value"></td>` +
+      `<td><input type="number" min="0" max="12" value="${l}" oninput="bemanningVerdier['${r.navn}-helg']=+this.value"></td></tr>`;
+  }
+  document.getElementById('bemanning-tabell').innerHTML = html + '</table>';
 }
 
 function hentBemanning() {
-  const les = kat => Object.fromEntries(skiftNavn().map(s => [s, Math.max(1, Math.min(12, +document.getElementById(`bem-${s}-${kat}`).value || 1))]));
-  return {hverdag: les('hverdag'), helg: les('helg')};
+  const aktive = [...document.querySelectorAll('.mod-check:checked')].map(c => c.value);
+  const cfg = {fagradiograf: {hverdag: bemVerdi('Fagradiograf', 'hverdag', 1), helg: bemVerdi('Fagradiograf', 'helg', 1)}};
+  for (const m of MODALITETER) {
+    if (aktive.includes(m.navn)) {
+      cfg[m.navn] = {hverdag: bemVerdi(m.navn, 'hverdag', m.standard[0]), helg: bemVerdi(m.navn, 'helg', m.standard[1])};
+    }
+  }
+  return cfg;
 }
 
 renderBemanning();
@@ -107,16 +140,17 @@ async function generer() {
 function visGenerert(d) {
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
   const b = d.bemanning;
-  html += `<p class="laster">${d.antall_ansatte} ansatte · Bemanning per skift: hverdag ${Object.values(b.hverdag).join('/')} · helg ${Object.values(b.helg).join('/')}</p>`;
+  const oppsummering = kat => Object.entries(b).filter(([, v]) => v[kat] > 0).map(([k, v]) => `${k}: ${v[kat]}`).join(' · ');
+  html += `<p class="laster">${d.antall_ansatte} ansatte · Per skift hverdag: ${oppsummering('hverdag')} · helg: ${oppsummering('helg')}</p>`;
   html += '<table><tr><th>Dag</th><th>Skift</th><th>Bemanning</th></tr>';
   for (const dag of d.dager) for (const skift of dag.skift) {
-    const navn = skift.bemanning.map(p => `<span class="pill ${esc(p.kompetanse)}">${esc(p.navn)}</span>`).join('');
+    const navn = skift.bemanning.map(p => `<span class="pill ${esc(p.yrkesgruppe)}" title="${esc(p.modaliteter.join(', '))}">${esc(p.navn)}</span>`).join('');
     const ekstra = skift.mangler ? ` <span style="color:var(--rød);font-weight:600">mangler ${skift.mangler}</span>` : '';
     html += `<tr><td>${esc(dag.ukedag)} ${esc(dag.dato.slice(5))}</td><td class="skift-navn">${esc(skift.navn)}</td><td>${navn || '–'}${ekstra}</td></tr>`;
   }
   html += '</table>';
-  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Kompetanse</th><th>%</th><th>Skift</th><th>Timer</th><th>Natt</th></tr>';
-  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.kompetanse)}</td><td>${a.prosent}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.natt}</td></tr>`;
+  html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Natt</th></tr>';
+  for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.natt}</td></tr>`;
   html += '</table>';
   if (d.preferanser.totalt) html += `<p>Preferanser innfridd: ${d.preferanser.innfridd} av ${d.preferanser.totalt}</p>`;
   if (d.udekket.length) {

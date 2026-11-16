@@ -14,6 +14,8 @@ UNNGA_STRAFF = 3.0
 RETTFERDIGHET_VEKT = 2.0
 NATT_BALANSE_VEKT = 0.5
 SAMMENHENGENDE_STRAFF = 0.3
+YRKESGRUPPER = {"fagradiograf", "radiograf"}
+FAGRA_MODALITET_STRAFF = 1.5
 
 
 @dataclass
@@ -62,11 +64,13 @@ class TurnusGenerator:
         if not kandidater:
             self._udekket.append((skift, krav))
             return
-        beste = max(kandidater, key=lambda a: (self._score(a, skift), a.id))
+        beste = max(kandidater, key=lambda a: (self._score(a, skift, krav), a.id))
         self._plan[beste.id].append(skift)
 
-    def _score(self, ansatt: Ansatt, skift: Skift) -> float:
+    def _score(self, ansatt: Ansatt, skift: Skift, krav: Krav) -> float:
         s = 0.0
+        if krav.kompetanse not in YRKESGRUPPER and "fagradiograf" in ansatt.kompetanse:
+            s -= FAGRA_MODALITET_STRAFF
         if self._matcher(ansatt.foretrekker, skift):
             s += PREF_BONUS
         if self._matcher(ansatt.unnga, skift):

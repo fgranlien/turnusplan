@@ -5,7 +5,7 @@ import argparse
 from datetime import date, timedelta
 
 from turnus import regler
-from turnus.demo_data import bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
+from turnus.demo_data import MODALITETER, bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
 from turnus.generator import TurnusGenerator
 from turnus.ics_import import les_ics
 from turnus.modeller import Skift, SkiftDef
@@ -62,8 +62,6 @@ def main() -> None:
     parser.add_argument("--start", default="2025-03-03", help="Startdato (ÅÅÅÅ-MM-DD, må være mandag)")
     parser.add_argument("--dager", type=int, default=14, help="Antall dager i horisonten")
     parser.add_argument("--langvakter", action="store_true", help="Bruk 12-timers langvakter (dag 07-19, natt 19-07)")
-    parser.add_argument("--bemanning-hverdag", type=int, default=None, metavar="N", help="Antall personer per skift på hverdager (man-fre)")
-    parser.add_argument("--bemanning-helg", type=int, default=None, metavar="N", help="Antall personer per skift i helgen (lør-søn)")
     parser.add_argument("--gui", action="store_true", help="Start grafisk grensesnitt i nettleseren")
     parser.add_argument("--port", type=int, default=8765, help="Port for GUI-et (standard 8765)")
     parser.add_argument("--valider-fil", metavar="FIL.ICS", help="Valider en eksisterende turnus i iCal-format i stedet for å generere")
@@ -85,10 +83,8 @@ def main() -> None:
     langvakt_avtale = True
 
     skift_defs = skift_defs_for(args.langvakter)
-    standard_hverdag, standard_helg = standard_bemanning(args.langvakter)
-    hverdag = {n: args.bemanning_hverdag or standard_hverdag[n] for n in standard_hverdag}
-    helg = {n: args.bemanning_helg or standard_helg[n] for n in standard_helg}
-    behov = bygg_behov(hverdag, helg)
+    bemanning = standard_bemanning()
+    behov = bygg_behov(bemanning, skift_defs)
     ansatte = bygg_ansatte(behov, skift_defs)
 
     plan = TurnusGenerator(ansatte, behov, start, antall_dager, skift_defs, langvakt_avtale).generer()
@@ -111,8 +107,9 @@ def main() -> None:
             for a_id, skift_liste in plan.tildelinger.items():
                 if skift in skift_liste:
                     a = ansatt_med_id[a_id]
-                    kompetanse = sorted(a.kompetanse)[0]
-                    bemanning.append(f"{a.navn} ({kompetanse})")
+                    yrkesgruppe = "FAGR" if "fagradiograf" in a.kompetanse else "rad"
+                    modaliteter = "/".join(sorted(a.kompetanse & set(MODALITETER)))
+                    bemanning.append(f"{a.navn} [{yrkesgruppe} {modaliteter}]")
             mangler = sum(1 for s, _ in plan.udekket if s == skift)
             ekstra = f"  [MANGLER {mangler}]" if mangler else ""
             print(f"  {skift_def.navn:6} {', '.join(bemanning) or '-'}{ekstra}")
@@ -120,13 +117,15 @@ def main() -> None:
     print("\n" + "=" * 78)
     print("OPPSUMMERING PER ANSATT")
     print("=" * 78)
-    print(f"{'Navn':<12} {'Komp.':<12} {'%':>4} {'Skift':>5} {'Timer':>6} {'Natt':>5}")
+    print(f"{'Navn':<14} {'Yrkesgruppe':<14} {'Modaliteter':<28} {'Skift':>5} {'Timer':>6} {'Natt':>5}")
     for a in ansatte:
         skift_liste = sorted(plan.tildelinger[a.id])
         timer = sum(s.varighet.total_seconds() / 3600 for s in skift_liste)
         n = sum(1 for s in skift_liste if s.type.er_natt)
+        yrkesgruppe = "fagradiograf" if "fagradiograf" in a.kompetanse else "radiograf"
+        modaliteter = ", ".join(sorted(a.kompetanse & set(MODALITETER)))
         print(
-            f"{a.navn:<12} {sorted(a.kompetanse)[0]:<12} {a.stillingsprosent:>4.0f} "
+            f"{a.navn:<14} {yrkesgruppe:<14} {modaliteter:<28} "
             f"{len(skift_liste):>5} {timer:>6.0f} {n:>5}"
         )
 
