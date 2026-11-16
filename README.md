@@ -19,6 +19,18 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 ./run.sh --start 2025-04-01 --dager 21 --langvakter
 ```
 
+### Valider din eksisterende turnus (iCal fra Minarbeidsplan)
+
+```bash
+python3 main.py --valider-fil minturnus.ics
+python3 main.py --valider-fil minturnus.ics --stillingsprosent 80
+```
+
+Leser arbeidsvakter med eksakte klokkeslett direkte fra filen (uavhengig av
+vaktbetegnelser), hopper over heldagshendelser (fridager som F1/F2), og
+rapporterer eventuelle brudd på døgnhvile, ukeshvile, uketimer, skiftlengde
+og natteserier.
+
 Alternativt direkte: `python3 main.py --langvakter`. Alt kjører på standardbiblioteket – ingen installasjoner nødvendig. Fungerer også på Linux/Windows.
 
 ## Regler som håndheves (harde begrensninger)

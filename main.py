@@ -7,9 +7,54 @@ from datetime import date, timedelta
 from turnus import regler
 from turnus.demo_data import demo_ansatte, demo_behov, demo_behov_langvakt, skift_defs_for
 from turnus.generator import TurnusGenerator
+from turnus.ics_import import les_ics
 from turnus.modeller import Skift, SkiftDef
 
 UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
+
+
+def valider_ics_fil(sti: str, stillingsprosent: float) -> None:
+    vakter, merknader = les_ics(sti)
+    print("=" * 78)
+    print(f"VALIDERING AV EKSISTERENDE TURNUS: {sti}")
+    print("=" * 78)
+
+    if not vakter:
+        print("\nIngen arbeidsvakter funnet i filen.")
+        for m in merknader:
+            print(f"  • {m}")
+        return
+
+    total_timer = sum(v.varighet.total_seconds() / 3600 for v in vakter)
+    print(f"\nPeriode: {vakter[0].start:%d.%m.%Y} – {vakter[-1].slutt:%d.%m.%Y}")
+    print(f"Arbeidsvakter: {len(vakter)}  |  Totalt: {total_timer:.1f} timer")
+
+    print(f"\n{'Vakttype':<10} {'Antall':>6} {'Timer':>7} {'Kategori':>9}")
+    typer: dict[str, list] = {}
+    for v in vakter:
+        typer.setdefault(v.etikett, []).append(v)
+    for etikett, liste in sorted(typer.items()):
+        timer = sum(v.varighet.total_seconds() / 3600 for v in liste)
+        print(f"{etikett:<10} {len(liste):>6} {timer:>7.1f} {liste[0].kategori:>9}")
+
+    fridager = sum(1 for m in merknader if "heldag" in m)
+    if fridager:
+        print(f"\nFridager (heldagshendelser): {fridager}")
+    for m in merknader:
+        if "heldag" not in m:
+            print(f"  ⚠ {m}")
+
+    feil = regler.valider_vakter(vakter, stillingsprosent, "Deg")
+    print("\n" + "=" * 78)
+    print(f"VALIDERING MOT ARBEIDSMILJØLOVEN KAP. 10 (stillingsprosent {stillingsprosent:.0f} %)")
+    print("=" * 78)
+    if feil:
+        for f in feil:
+            print(f"  ✗ {f}")
+        print(f"\n  Totalt {len(feil)} mulig(e) lovbrudd – verifiser mot gjeldende avtaler.")
+    else:
+        print("  ✓ Ingen brudd funnet: døgnhvile (11 t), ukeshvile (35 t), uketimer (40 t),")
+        print("    skiftlengde og natteserier er innenfor grensene.")
 
 
 def main() -> None:
@@ -17,7 +62,13 @@ def main() -> None:
     parser.add_argument("--start", default="2025-03-03", help="Startdato (ÅÅÅÅ-MM-DD, må være mandag)")
     parser.add_argument("--dager", type=int, default=14, help="Antall dager i horisonten")
     parser.add_argument("--langvakter", action="store_true", help="Bruk 12-timers langvakter (dag 07-19, natt 19-07)")
+    parser.add_argument("--valider-fil", metavar="FIL.ICS", help="Valider en eksisterende turnus i iCal-format i stedet for å generere")
+    parser.add_argument("--stillingsprosent", type=float, default=100.0, help="Stillingsprosent for validering (standard 100)")
     args = parser.parse_args()
+
+    if args.valider_fil:
+        valider_ics_fil(args.valider_fil, args.stillingsprosent)
+        return
 
     start = date.fromisoformat(args.start)
     antall_dager = args.dager

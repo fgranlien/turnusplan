@@ -98,6 +98,76 @@ def kandidat_er_lovlig(
     return True
 
 
+def valider_vakter(
+    vakter: list,
+    stillingsprosent: float = 100.0,
+    navn: str = "Ansatt",
+    langvakt_avtale: bool = True,
+) -> list[str]:
+    feil: list[str] = []
+    sortert = sorted(vakter, key=lambda v: v.start)
+    if not sortert:
+        return feil
+
+    for v in sortert:
+        t = v.varighet.total_seconds() / 3600
+        if t > MAKS_SKIFTLENGDE_MED_AVTALE + 1e-9:
+            feil.append(
+                f"Skiftlengde: {v.etikett} {v.start:%d.%m} varer {t:.1f} t (over maks {MAKS_SKIFTLENGDE_MED_AVTALE:.0f} t)"
+            )
+        elif t > MAKS_TIMER_PER_DOGN_UTVIDET + 1e-9 and not langvakt_avtale:
+            feil.append(
+                f"Skiftlengde: {v.etikett} {v.start:%d.%m} varer {t:.1f} t uten avtale (maks {MAKS_TIMER_PER_DOGN_UTVIDET:.0f} t per aml §10-3)"
+            )
+
+    for a, b in zip(sortert, sortert[1:]):
+        if not dognhvile_ok([a], b):
+            feil.append(
+                f"Døgnhvile: under 11 t mellom {a.etikett} ({a.start:%d.%m %H:%M}–{a.slutt:%d.%m %H:%M}) "
+                f"og {b.etikett} ({b.start:%d.%m %H:%M})"
+            )
+
+    forste_uke = sortert[0].start.date() - timedelta(days=sortert[0].start.weekday())
+    siste_dag = sortert[-1].slutt.date()
+    antall_uker = (siste_dag - forste_uke).days // 7 + 1
+    grense = MAKS_UKETIMER_NORMAL * stillingsprosent / 100
+    for u in range(antall_uker + 1):
+        ws = forste_uke + timedelta(days=7 * u)
+        if not ukeshvile_ok(sortert, ws):
+            feil.append(f"Ukeshvile: {navn} mangler 35 t sammenhengende hvile i uke {ws.isocalendar()[1]}")
+        timer = sum(
+            v.varighet.total_seconds() / 3600
+            for v in sortert
+            if _midnatt(ws) <= v.start < _midnatt(ws) + UKELANGD
+        )
+        if timer > grense + 1e-9:
+            feil.append(
+                f"Uketimer: {navn} har {timer:.1f} t i uke {ws.isocalendar()[1]} (grense {grense:.0f} t)"
+            )
+
+    natt = lambda v: v.slutt.date() > v.start.date()
+    natt_dager = sorted({v.start.date() for v in sortert if natt(v)})
+    lengde = 0
+    forrige = None
+    for d in natt_dager:
+        lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
+        if lengde > MAKS_NATTER_ONK:
+            feil.append(f"Natteserie: {navn} har {lengde} nattarbeid i strekk (maks {MAKS_NATTER_ONK})")
+        forrige = d
+
+    dogn_grense = MAKS_SKIFTLENGDE_MED_AVTALE if langvakt_avtale else MAKS_TIMER_PER_DOGN
+    timer_per_dogn: dict[date, float] = {}
+    for v in sortert:
+        timer_per_dogn[v.start.date()] = timer_per_dogn.get(v.start.date(), 0.0) + v.varighet.total_seconds() / 3600
+    for d, t in timer_per_dogn.items():
+        if t > dogn_grense + 1e-9:
+            feil.append(
+                f"Døgntimer: {navn} har {t:.1f} t arbeid den {d:%d.%m} (maks {dogn_grense:.0f} t)"
+            )
+
+    return feil
+
+
 def valider_plan(
     tildelinger: dict[str, list[Skift]],
     ansatte: list[Ansatt],
