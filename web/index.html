@@ -71,16 +71,19 @@ td.c-m { background:#fdf6dd; color:#8a7500; font-weight:600; }
 td.ute { background:#f0f1f3; }
 .badge { display:inline-block; font-size:9px; border-radius:4px; padding:1px 3px; margin-left:3px; background:#eef3fb; color:var(--blå); font-weight:600; vertical-align:middle; }
 body.mork .badge { background:#24303f; }
+table.matrix tr:hover td { box-shadow: inset 0 0 0 9999px rgba(11,98,214,.06); }
 .under { color:#b26a00; font-size:11px; white-space:nowrap; margin-left:4px; }
 .modal-bakgrunn { position:fixed; inset:0; background:rgba(20,26,33,.55); display:flex; align-items:center; justify-content:center; z-index:10; }
 .modal { background:var(--card); color:var(--tekst); border-radius:12px; padding:20px 24px; max-width:560px; width:92%; max-height:80vh; overflow:auto; }
 .modal h3 { margin-top:0; }
 .modal .lukk { float:right; background:#e6e9ee; color:var(--tekst); padding:4px 10px; font-size:12.5px; }
+button.spinner::after { content:''; display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; margin-left:8px; vertical-align:-2px; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   body, body.mork { --bg:#fff; --card:#fff; --tekst:#000; --grå:#555; --linje:#bbb; }
   body { background:#fff; color:#000; }
-  header, .tabbar, button, .vaktbytte-boks { display: none !important; }
+  header, .tabbar, button, .vaktbytte-boks, .minuke-velg { display: none !important; }
   main { max-width: none; padding: 0; }
   .card { border: 0; border-radius: 0; padding: 0; margin: 0 0 14px; background: #fff; }
   #tab-generer, #tab-ansatte, #tab-valider { display: none !important; }
@@ -593,6 +596,7 @@ async function slettForvalg() {
   }
 }
 
+hentInnstillinger();
 lastSkift();
 lastAnsatte();
 lastForvalgListe();
@@ -601,7 +605,8 @@ renderLaaste();
 
 async function generer() {
   const knapp = document.getElementById('generer-knapp');
-  knapp.disabled = true; knapp.textContent = 'Genererer …';
+  knapp.disabled = true; knapp.classList.add('spinner'); knapp.textContent = 'Genererer …';
+  lagreInnstillinger();
   try {
     const r = await fetch('/api/generer', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({start: document.getElementById('start').value,
@@ -620,7 +625,7 @@ async function generer() {
   } catch (e) {
     document.getElementById('resultat').innerHTML = `<div class="status brudd">Feil: ${esc(e.message)}</div>`;
   }
-  knapp.disabled = false; knapp.textContent = 'Generer forslag';
+  knapp.disabled = false; knapp.classList.remove('spinner'); knapp.textContent = 'Generer forslag';
 }
 
 const DAGNAVN = ['man', 'tir', 'ons', 'tor', 'fre', 'lør', 'søn'];
@@ -751,6 +756,7 @@ function visGenerert(d) {
   html += '<div id="sammenligning"></div>';
   html += visTariff(d);
   html += visVaktbytte(d);
+  html += visMinUkeValg(d);
   const rot = d.rotasjon && d.rotasjon.aktiv;
   html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th>' + (rot ? '<th>Gruppe</th>' : '') + '<th>iCal</th></tr>';
   const norm = d.tariff.norm;
@@ -817,6 +823,72 @@ function visSammenligning() {
   }
   el.innerHTML = html + '</table>';
 }
+
+function visMinUkeValg(d) {
+  const valg = d.ansatte.map(a => `<option value="${esc(a.navn)}">${esc(a.navn)}</option>`).join('');
+  return `<h3>Min uke</h3><div class="rad"><label class="minuke-velg">Velg person <select id="minuke-navn" onchange="visMinUke()"><option value="">–</option>${valg}</select></label></div><div id="minuke"></div>`;
+}
+
+function visMinUke() {
+  const el = document.getElementById('minuke');
+  if (!el) return;
+  const navn = document.getElementById('minuke-navn').value;
+  if (!navn || !sisteResultat) { el.innerHTML = ''; return; }
+  const a = sisteResultat.ansatte.find(x => x.navn === navn);
+  if (!a) { el.innerHTML = ''; return; }
+  const uker = {};
+  for (const v of a.vakter || []) {
+    const dt = new Date(v.dato + 'T12:00:00');
+    const mandag = new Date(dt);
+    mandag.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    const nokkel = mandag.toISOString().slice(0, 10);
+    (uker[nokkel] = uker[nokkel] || []).push(v);
+  }
+  let html = '';
+  for (const [start, vakter] of Object.entries(uker)) {
+    const timer = vakter.reduce((s, v) => s + v.timer, 0);
+    html += `<p style="margin:8px 0 2px"><b>Uke fra ${esc(start.slice(5))}</b> · ${timer.toFixed(1)} t</p>`;
+    html += vakter.map(v => {
+      const dt = new Date(v.dato + 'T12:00:00');
+      const dag = DAGNAVN[(dt.getDay() + 6) % 7];
+      return `<span class="pill">${esc(dag)} ${esc(v.dato.slice(5))} · ${esc(v.skift)} ${esc(v.start)}–${esc(v.slutt)} (${v.timer} t)</span>`;
+    }).join('');
+  }
+  el.innerHTML = html || '<p class="laster">Ingen vakter i perioden.</p>';
+}
+
+function lagreInnstillinger() {
+  try {
+    localStorage.setItem('turnusplan-innstillinger', JSON.stringify({
+      start: document.getElementById('start').value,
+      dager: document.getElementById('dager').value,
+      norm: document.getElementById('norm').value,
+      motor: document.getElementById('motor').value,
+      rotasjon: document.getElementById('rotasjon').checked,
+      syklus: document.getElementById('syklus').value,
+    }));
+  } catch (e) {}
+}
+
+function hentInnstillinger() {
+  try {
+    const s = JSON.parse(localStorage.getItem('turnusplan-innstillinger') || '{}');
+    if (s.start) document.getElementById('start').value = s.start;
+    if (s.dager) document.getElementById('dager').value = s.dager;
+    if (s.norm) document.getElementById('norm').value = s.norm;
+    if (s.motor) document.getElementById('motor').value = s.motor;
+    if (s.rotasjon !== undefined) document.getElementById('rotasjon').checked = s.rotasjon;
+    if (s.syklus) document.getElementById('syklus').value = s.syklus;
+  } catch (e) {}
+}
+
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (e.key === 'Escape') { lukkModal(); return; }
+  if (tag === 'input' || tag === 'select' || tag === 'textarea' || tag === 'button') return;
+  if (e.key === 'Enter') generer();
+  else if (['1', '2', '3', '4'].includes(e.key)) visTab(['generer', 'turnus', 'ansatte', 'valider'][+e.key - 1]);
+});
 
 function visVaktbytte(d) {
   const navn = d.ansatte.map(a => `<option value="${esc(a.navn)}">${esc(a.navn)}</option>`).join('');

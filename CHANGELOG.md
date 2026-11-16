@@ -3,6 +3,16 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.14 – Daglig bruk og polish
+
+- Siste innstillinger (startdato, dager, norm, motor, rotasjon og syklus) huskes i
+  nettleseren og gjenopprettes ved neste oppstart
+- «Min uke» – velg deg selv i Turnus-fanen og se dine vakter per uke med klokkeslett
+  og timer (mobilvennlig liste, skjules på utskrift)
+- Spinner på Generer-knappen mens turnusen beregnes, og markør-heving (hover) på
+  raden i vaktmatrisen
+- Tastaturstøtte: Enter genererer forslag, 1–4 bytter fane, ESC lukker ukekort-modalen
+
 ## 2.13 – Brukbarhet: ukekort, låste vakter, sammenligning og dekningsforslag
 
 - Fargekodete kompetanse-markører: modalitetene vises som korte badges (RX/CT/MR/UL/MG/IV)

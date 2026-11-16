@@ -43,6 +43,10 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
   raske greedy-motoren: modellerer hele horisonten samtidig og finner bevist
   optimal turnus innen alle aml- og tariffregler. Installer valgfritt med
   `pip3 install ortools` – uten den brukes greedy automatisk
+- **Huskede innstillinger** – startdato, lengde, norm, motor og rotasjon gjenopprettes
+  ved neste oppstart
+- **Min uke** – personlig ukeliste med klokkeslett i Turnus-fanen
+- **Tastatur** – Enter = generer, 1–4 = faner, ESC = lukk modal
 - **Ukekort per ansatt** – klikk på navnet i vaktmatrisen for alle vakter med
   klokkeslett, timer per uke, natt-/helgetelling og tariffstatus
 - **Låste vakter** – lås faste vakter i Generer-fanen; de fordeles først, og ulovlige
