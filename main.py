@@ -83,7 +83,7 @@ def main() -> None:
     langvakt_avtale = True
 
     skift_defs = skift_defs_for(args.langvakter)
-    bemanning = standard_bemanning()
+    bemanning = standard_bemanning(skift_defs)
     behov = bygg_behov(bemanning, skift_defs)
     ansatte = bygg_ansatte(behov, skift_defs)
 
@@ -100,8 +100,11 @@ def main() -> None:
 
     for i in range(antall_dager):
         dato = start + timedelta(days=i)
+        kategori = "helg" if dato.weekday() >= 5 else "hverdag"
         print(f"\n{UKEDAGER[dato.weekday()]} {dato:%d.%m}")
         for skift_def in skift_defs:
+            if kategori not in skift_def.dager:
+                continue
             skift = Skift(dato, skift_def)
             bemanning = []
             for a_id, skift_liste in plan.tildelinger.items():

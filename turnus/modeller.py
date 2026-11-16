@@ -7,9 +7,10 @@ from datetime import date, datetime, timedelta
 @dataclass(frozen=True, order=True)
 class SkiftDef:
     navn: str
-    start_time: int
-    slutt_time: int
+    start_time: float
+    slutt_time: float
     er_natt: bool = False
+    dager: tuple[str, ...] = ("hverdag", "helg")
 
     @property
     def varighet(self) -> timedelta:

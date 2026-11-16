@@ -33,7 +33,7 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 Åpner et grafisk grensesnitt i nettleseren din (serveren kjører kun lokalt på
 127.0.0.1, ingenting eksponeres mot nettet). Fra GUI-et kan du:
 
-- Generere turnusforslag (velg startdato, lengde og 8 t/12 t-modus)
+- Generere turnusforslag med konfigurerbare skift (mellomvakt, kveld, natt osv.)
 - Rullende turnuser på 4, 6, 8 eller 12 uker
 - Velge modaliteter og bemanning per skift, atskilt for hverdag og helg
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
@@ -41,8 +41,19 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
   for demopoolen
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
 
-Generert turnus vises i egen fane som vaktmatrise per uke per ansatt (D/K/N),
+Generert turnus vises i egen fane som vaktmatrise per uke per ansatt (D/K/N/M),
 med sum timer per uke, totalt og snitt per uke mot valgt arbeidsuke-norm.
+
+### Skift og mellomvakter
+
+Skiftene er fullt konfigurerbare i GUI-et (navn, start, slutt, hverdag/helg) og
+lagres i `skift.json`. Standard inkluderer mellomvakt MELLOM 11:30–19:00 på
+hverdager; endre tidene (f.eks. til 15:00–23:00) for å gjøre den om til
+kveldsvakt. Slutt før start tolkes som nattskift over midnatt. Bemanningen
+gis per skift og kompetanse. Maks skiftlengde er 12 t (aml §10-3/§10-6 med
+avtale).
+
+Endringslogg: se [CHANGELOG.md](CHANGELOG.md). Versjon vises i GUI-overskriften.
 
 ### Arbeidsuke-norm (tariff)
 

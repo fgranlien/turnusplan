@@ -12,24 +12,30 @@ NAVN = {
     "fagradiograf": ["Anne", "Bjørn", "Cecilie", "David", "Eva", "Fredrik", "Geir", "Hanna", "Ivar", "Jenny"],
 }
 
-STANDARD_BEMANNING = {
-    "fagradiograf": {"hverdag": 1, "helg": 1},
-    "Røntgen": {"hverdag": 2, "helg": 1},
-    "CT": {"hverdag": 1, "helg": 1},
-    "MR": {"hverdag": 1, "helg": 1},
+STANDARD_PER_SKIFT = {
+    "fagradiograf": (1, 1),
+    "Røntgen": (2, 1),
+    "CT": (1, 1),
+    "MR": (1, 1),
 }
 
 
 def bygg_behov(
-    bemanning: dict[str, dict[str, int]],
+    bemanning: dict[str, dict[str, dict[str, int]]],
     skift_defs: list[SkiftDef],
 ) -> dict[str, dict[str, list[Krav]]]:
-    rekkefolge = ["fagradiograf"] + [k for k in bemanning if k != "fagradiograf"]
     behov: dict[str, dict[str, list[Krav]]] = {}
     for kategori in ("hverdag", "helg"):
         rad: dict[str, list[Krav]] = {}
         for skift_def in skift_defs:
-            krav = [Krav(komp, int(bemanning.get(komp, {}).get(kategori, 0))) for komp in rekkefolge]
+            if kategori not in skift_def.dager:
+                continue
+            skift_cfg = bemanning.get(skift_def.navn, {})
+            rekkefolge = ["fagradiograf"] + [k for k in skift_cfg if k != "fagradiograf"]
+            krav = [
+                Krav(komp, int(skift_cfg.get(komp, {}).get(kategori, 0)))
+                for komp in rekkefolge
+            ]
             krav = [k for k in krav if k.antall > 0]
             if krav:
                 rad[skift_def.navn] = krav
@@ -116,11 +122,20 @@ def bygg_ansatte(behov: dict[str, dict[str, list[Krav]]], skift_defs: list[Skift
     return ansatte
 
 
+def standard_bemanning(skift_defs: list[SkiftDef]) -> dict[str, dict[str, dict[str, int]]]:
+    cfg: dict[str, dict[str, dict[str, int]]] = {}
+    for d in skift_defs:
+        rad: dict[str, dict[str, int]] = {}
+        for komp, (hverdag, helg) in STANDARD_PER_SKIFT.items():
+            if d.navn == "MELLOM":
+                rad[komp] = {"hverdag": 1 if komp == "Røntgen" else 0, "helg": 0}
+            else:
+                rad[komp] = {"hverdag": hverdag, "helg": helg}
+        cfg[d.navn] = rad
+    return cfg
+
+
 def skift_defs_for(langvakter: bool) -> list[SkiftDef]:
-    from .modeller import LANGVAKT_SKIFT, STANDARD_SKIFT
+    from .skift_lager import skift_defs_for as _sdf
 
-    return LANGVAKT_SKIFT if langvakter else STANDARD_SKIFT
-
-
-def standard_bemanning() -> dict[str, dict[str, int]]:
-    return {komp: dict(verdier) for komp, verdier in STANDARD_BEMANNING.items()}
+    return _sdf(langvakter)

@@ -49,11 +49,12 @@ table.matrix td.sum { font-weight:600; background:#f7f8fa; }
 td.c-d { background:#e7f6ee; color:var(--grønn); font-weight:600; }
 td.c-k { background:#fdf1e0; color:#b26a00; font-weight:600; }
 td.c-n { background:#e3ecfa; color:#1c4d8f; font-weight:600; }
+td.c-m { background:#fdf6dd; color:#8a7500; font-weight:600; }
 td.ute { background:#f0f1f3; }
 </style>
 </head>
 <body>
-<header><h1>Turnusplan</h1><p>Turnusforslag og validering i henhold til arbeidsmiljøloven kap. 10</p></header>
+<header><h1>Turnusplan <span id="versjon" class="laster"></span></h1><p>Turnusforslag og validering i henhold til arbeidsmiljøloven kap. 10</p></header>
 <main>
   <div class="tabbar">
     <button class="tab aktiv" id="tabknapp-generer" onclick="visTab('generer')">Generer</button>
@@ -67,7 +68,6 @@ td.ute { background:#f0f1f3; }
     <div class="rad">
       <label>Startdato <input type="date" id="start" value="2025-03-03"></label>
       <label>Antall dager <input type="number" id="dager" value="28" min="7" max="84" step="7"></label>
-      <label class="sjekk"><input type="checkbox" id="langvakter" onchange="renderBemanning()"> 12-timers langvakter</label>
       <button id="generer-knapp" onclick="generer()">Generer forslag</button>
     </div>
     <div class="rad" style="margin-top:10px">
@@ -88,9 +88,28 @@ td.ute { background:#f0f1f3; }
         </select>
       </label>
     </div>
-    <h3>Bemanning og modaliteter</h3>
+  </section>
+  <section class="card">
+    <h2>Skift og mellomvakter</h2>
+    <div class="rad">
+      <label>Forhåndsvalg:
+        <span>
+          <button class="liten" onclick="settSkiftPreset('standard')">8 t: DAG/KVELD/NATT</button>
+          <button class="liten" onclick="settSkiftPreset('mellomvakt')">8 t + mellomvakt</button>
+          <button class="liten" onclick="settSkiftPreset('langvakter')">12 t: DAG12/NATT12</button>
+        </span>
+      </label>
+      <button onclick="leggTilSkift()">+ Legg til skift</button>
+      <button id="lagre-skift-knapp" onclick="lagreSkift()">Lagre skift</button>
+    </div>
+    <div id="skift-tabell"></div>
+    <div id="skift-status"></div>
+    <p class="laster">Slutt før start betyr nattskift over midnatt. Mellomvakt 11:30–19:00 på hverdager er standard – endre tidene (f.eks. til 15:00–23:00) for å gjøre den om til kveldsvakt.</p>
+  </section>
+  <section class="card">
+    <h2>Bemanning per skift</h2>
     <div id="bemanning"></div>
-    <p class="laster">Velg hvilke modaliteter avdelingen dekker, og hvor mange personer per skift som trengs med hver kompetanse. Hverdag = man–fre, helg = lør–søn. Antall ansatte beregnes automatisk; fagradiografer kan dekke alle modaliteter.</p>
+    <p class="laster">Velg hvilke modaliteter avdelingen dekker. I hver celle: øverste felt = hverdag (man–fre), nederste = helg (lør–søn). Antall ansatte beregnes automatisk.</p>
   </section>
   </div>
   <div id="tab-turnus" class="skjult">
@@ -123,69 +142,143 @@ td.ute { background:#f0f1f3; }
 <script>
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-const MODALITETER = [
-  {navn: 'Røntgen', standard: [2, 1]},
-  {navn: 'CT', standard: [1, 1]},
-  {navn: 'MR', standard: [1, 1]},
-  {navn: 'Ultralyd', standard: [1, 0]},
-  {navn: 'Mammografi', standard: [1, 0]},
-  {navn: 'Intervensjon', standard: [1, 1]},
-];
-const standardValgte = ['Røntgen', 'CT', 'MR'];
+const MODALITETER = ['R\u00f8ntgen', 'CT', 'MR', 'Ultralyd', 'Mammografi', 'Intervensjon'];
+const standardValgte = ['R\u00f8ntgen', 'CT', 'MR'];
 let bemanningVerdier = {};
+let skiftListe = [];
+
+const SKIFT_PRESETS = {
+  standard: [['DAG', '07:00', '15:00', true, true], ['KVELD', '15:00', '23:00', true, true], ['NATT', '23:00', '07:00', true, true]],
+  mellomvakt: [['DAG', '07:00', '15:00', true, true], ['MELLOM', '11:30', '19:00', true, false], ['KVELD', '15:00', '23:00', true, true], ['NATT', '23:00', '07:00', true, true]],
+  langvakter: [['DAG12', '07:00', '19:00', true, true], ['NATT12', '19:00', '07:00', true, true]],
+};
 
 function renderBemanning() {
-  let html = '<p style="margin:0 0 8px;font-size:13px;color:var(--grå)">Modaliteter avdelingen dekker:</p><div class="rad" style="margin-bottom:12px">';
+  let html = '<p style="margin:0 0 8px;font-size:13px;color:var(--gr\u00e5)">Modaliteter avdelingen dekker:</p><div class="rad" style="margin-bottom:12px">';
   for (const m of MODALITETER) {
-    const valgt = standardValgte.includes(m.navn);
-    html += `<label class="sjekk"><input type="checkbox" class="mod-check" value="${m.navn}" ${valgt ? 'checked' : ''} onchange="renderBemanningTabell()"> ${m.navn}</label>`;
+    const valgt = standardValgte.includes(m);
+    html += `<label class="sjekk"><input type="checkbox" class="mod-check" value="${m}" ${valgt ? 'checked' : ''} onchange="renderBemanningTabell()"> ${m}</label>`;
   }
   html += '</div><div id="bemanning-tabell"></div>';
   document.getElementById('bemanning').innerHTML = html;
   renderBemanningTabell();
 }
 
-function bemVerdi(navn, kat, standard) {
-  if (bemanningVerdier[`${navn}-${kat}`] === undefined) bemanningVerdier[`${navn}-${kat}`] = standard;
-  return bemanningVerdier[`${navn}-${kat}`];
+function standardBem(skiftNavn, komp) {
+  if (skiftNavn === 'MELLOM') return komp === 'R\u00f8ntgen' ? [1, 0] : [0, 0];
+  const std = {fagradiograf: [1, 1], 'R\u00f8ntgen': [2, 1], 'CT': [1, 1], 'MR': [1, 1]};
+  return std[komp] || [0, 0];
+}
+
+function bemVerdi(skiftNavn, komp, kat) {
+  const nokkel = `${skiftNavn}|${komp}|${kat}`;
+  if (bemanningVerdier[nokkel] === undefined) {
+    const std = standardBem(skiftNavn, komp);
+    bemanningVerdier[nokkel] = kat === 'hverdag' ? std[0] : std[1];
+  }
+  return bemanningVerdier[nokkel];
 }
 
 function renderBemanningTabell() {
   const aktive = [...document.querySelectorAll('.mod-check:checked')].map(c => c.value);
-  const rader = [{navn: 'Fagradiograf', standard: [1, 1]}]
-    .concat(MODALITETER.filter(m => aktive.includes(m.navn)));
-  let html = '<table><tr><th>Kompetanse per skift</th><th>Hverdag (man–fre)</th><th>Helg (lør–søn)</th></tr>';
-  for (const r of rader) {
-    const h = bemVerdi(r.navn, 'hverdag', r.standard[0]);
-    const l = bemVerdi(r.navn, 'helg', r.standard[1]);
-    html += `<tr><td class="skift-navn">${esc(r.navn)}</td>` +
-      `<td><input type="number" min="0" max="12" value="${h}" oninput="bemanningVerdier['${r.navn}-hverdag']=+this.value"></td>` +
-      `<td><input type="number" min="0" max="12" value="${l}" oninput="bemanningVerdier['${r.navn}-helg']=+this.value"></td></tr>`;
+  const kompRader = ['fagradiograf'].concat(aktive);
+  if (!skiftListe.length) {
+    document.getElementById('bemanning-tabell').innerHTML = '<p class="laster">Legg til skift f\u00f8rst.</p>';
+    return;
+  }
+  let html = '<table><tr><th>Skift</th>';
+  for (const k of kompRader) html += `<th>${k === 'fagradiograf' ? 'Fagradiograf' : esc(k)}<br><span style="text-transform:none;font-weight:400">hverdag / helg</span></th>`;
+  html += '</tr>';
+  for (const s of skiftListe) {
+    html += `<tr><td class="skift-navn">${esc(s.navn)}</td>`;
+    for (const k of kompRader) {
+      const h = bemVerdi(s.navn, k, 'hverdag');
+      const l = bemVerdi(s.navn, k, 'helg');
+      html += `<td><input type="number" min="0" max="12" value="${h}" style="width:52px" oninput="bemanningVerdier['${s.navn}|${k}|hverdag']=+this.value">` +
+        `<input type="number" min="0" max="12" value="${l}" style="width:52px;margin-left:4px" oninput="bemanningVerdier['${s.navn}|${k}|helg']=+this.value"></td>`;
+    }
+    html += '</tr>';
   }
   document.getElementById('bemanning-tabell').innerHTML = html + '</table>';
 }
 
 function hentBemanning() {
   const aktive = [...document.querySelectorAll('.mod-check:checked')].map(c => c.value);
-  const cfg = {fagradiograf: {hverdag: bemVerdi('Fagradiograf', 'hverdag', 1), helg: bemVerdi('Fagradiograf', 'helg', 1)}};
-  for (const m of MODALITETER) {
-    if (aktive.includes(m.navn)) {
-      cfg[m.navn] = {hverdag: bemVerdi(m.navn, 'hverdag', m.standard[0]), helg: bemVerdi(m.navn, 'helg', m.standard[1])};
+  const kompRader = ['fagradiograf'].concat(aktive);
+  const cfg = {};
+  for (const s of skiftListe) {
+    const rad = {};
+    for (const k of kompRader) {
+      rad[k] = {hverdag: bemVerdi(s.navn, k, 'hverdag'), helg: bemVerdi(s.navn, k, 'helg')};
     }
+    cfg[s.navn] = rad;
   }
   return cfg;
 }
 
-function visTab(navn) {
-  for (const t of ['generer', 'turnus', 'ansatte', 'valider']) {
-    document.getElementById('tab-' + t).classList.toggle('skjult', t !== navn);
-    document.getElementById('tabknapp-' + t).classList.toggle('aktiv', t === navn);
-  }
+function renderSkift() {
+  let html = '<table><tr><th>Navn</th><th>Start</th><th>Slutt</th><th>Hverdag</th><th>Helg</th><th></th></tr>';
+  skiftListe.forEach((s, i) => {
+    html += `<tr>` +
+      `<td><input type="text" value="${esc(s.navn)}" style="width:90px" oninput="settSkiftFelt(${i}, 'navn', this.value)"></td>` +
+      `<td><input type="time" value="${esc(s.start)}" onchange="settSkiftFelt(${i}, 'start', this.value)"></td>` +
+      `<td><input type="time" value="${esc(s.slutt)}" onchange="settSkiftFelt(${i}, 'slutt', this.value)"></td>` +
+      `<td><input type="checkbox" ${s.hverdag ? 'checked' : ''} onchange="settSkiftFelt(${i}, 'hverdag', this.checked)"></td>` +
+      `<td><input type="checkbox" ${s.helg ? 'checked' : ''} onchange="settSkiftFelt(${i}, 'helg', this.checked)"></td>` +
+      `<td><button class="liten" onclick="fjernSkift(${i})">Fjern</button></td>` +
+      `</tr>`;
+  });
+  document.getElementById('skift-tabell').innerHTML = html + '</table>';
 }
 
-function settUker(uker) {
-  document.getElementById('dager').value = uker * 7;
-  document.querySelectorAll('button.liten').forEach(b => b.classList.toggle('aktiv', b.textContent === uker + ' uker'));
+function settSkiftFelt(i, felt, verdi) {
+  skiftListe[i][felt] = verdi;
+  if (felt !== 'navn') renderBemanningTabell();
+}
+
+function fjernSkift(i) {
+  skiftListe.splice(i, 1);
+  renderSkift();
+  renderBemanningTabell();
+}
+
+function leggTilSkift() {
+  skiftListe.push({navn: 'NYTT', start: '09:00', slutt: '17:00', hverdag: true, helg: false});
+  renderSkift();
+  renderBemanningTabell();
+}
+
+function settSkiftPreset(navn) {
+  skiftListe = SKIFT_PRESETS[navn].map(([n, s, e, h, l]) => ({navn: n, start: s, slutt: e, hverdag: h, helg: l}));
+  renderSkift();
+  renderBemanningTabell();
+}
+
+async function lagreSkift() {
+  const knapp = document.getElementById('lagre-skift-knapp');
+  knapp.disabled = true; knapp.textContent = 'Lagrer \u2026';
+  try {
+    const r = await fetch('/api/skift', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(skiftListe)});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.feil || r.status);
+    document.getElementById('skift-status').innerHTML = `<div class="status ok">\u2713 Lagret ${d.antall} skift til skift.json.</div>`;
+  } catch (e) {
+    document.getElementById('skift-status').innerHTML = `<div class="status brudd">Kunne ikke lagre skift: ${esc(e.message)}</div>`;
+  }
+  knapp.disabled = false; knapp.textContent = 'Lagre skift';
+}
+
+async function lastSkift() {
+  try {
+    const r = await fetch('/api/skift');
+    const d = await r.json();
+    skiftListe = d.skift;
+    document.getElementById('versjon').textContent = 'v' + d.versjon;
+    renderSkift();
+    renderBemanningTabell();
+  } catch (e) {
+    document.getElementById('skift-status').innerHTML = `<div class="status brudd">Kunne ikke laste skift: ${esc(e.message)}</div>`;
+  }
 }
 
 renderBemanning();
@@ -307,7 +400,7 @@ async function generer() {
     const r = await fetch('/api/generer', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({start: document.getElementById('start').value,
                             dager: +document.getElementById('dager').value,
-                            langvakter: document.getElementById('langvakter').checked,
+                            skift: skiftListe,
                             bemanning: hentBemanning(),
                             uke_time_norm: +document.getElementById('norm').value})});
     const data = await r.json();

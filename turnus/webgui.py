@@ -9,8 +9,9 @@ from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import ansatte_lager, regler
-from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
+from . import VERSJON, ansatte_lager, regler, skift_lager
+from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, standard_bemanning
+from .modeller import SkiftDef
 from .generator import TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
 from .modeller import Skift
@@ -25,14 +26,19 @@ def generer_json(
     langvakter: bool,
     bemanning: dict | None = None,
     uke_time_norm: float = 40.0,
+    skift_defs: list[SkiftDef] | None = None,
 ) -> dict:
-    defs = skift_defs_for(langvakter)
-    bemanning_cfg = standard_bemanning()
-    for komp, verdier in (bemanning or {}).items():
-        if komp in bemanning_cfg:
-            bemanning_cfg[komp] = {
-                "hverdag": max(0, min(12, int(verdier.get("hverdag", bemanning_cfg[komp]["hverdag"])))),
-                "helg": max(0, min(12, int(verdier.get("helg", bemanning_cfg[komp]["helg"])))),
+    defs = skift_defs if skift_defs is not None else skift_lager.skift_defs_for(langvakter)
+    bemanning_cfg = standard_bemanning(defs)
+    for skift_navn, skift_komp in (bemanning or {}).items():
+        if skift_navn not in bemanning_cfg or not isinstance(skift_komp, dict):
+            continue
+        for komp, verdier in skift_komp.items():
+            if komp not in bemanning_cfg[skift_navn] or not isinstance(verdier, dict):
+                continue
+            bemanning_cfg[skift_navn][komp] = {
+                "hverdag": max(0, min(12, int(verdier.get("hverdag", 0)))),
+                "helg": max(0, min(12, int(verdier.get("helg", 0)))),
             }
     behov = bygg_behov(bemanning_cfg, defs)
     lagrede = ansatte_lager.les_lagrede()
@@ -59,8 +65,11 @@ def generer_json(
     dager = []
     for i in range(antall_dager):
         dato = start + timedelta(days=i)
+        kategori = "helg" if dato.weekday() >= 5 else "hverdag"
         skift_rader = []
         for skift_def in defs:
+            if kategori not in skift_def.dager:
+                continue
             skift = Skift(dato, skift_def)
             bemanning = [
                 {
@@ -126,8 +135,10 @@ def generer_json(
     kriterier = regler.turnus_kriterier(plan.tildelinger, ansatte, start, antall_dager, defs)
     tariff_brudd = regler.tariff_sjekk(plan.tildelinger, ansatte, start, antall_dager, uke_time_norm)
 
+    maks_var = max(d.varighet.total_seconds() / 3600 for d in defs)
+    modus = "langvakter 12 t" if maks_var > 10 else "8-timers turnus"
     return {
-        "modus": "langvakter 12 t" if langvakter else "tredelt turnus 8 t",
+        "modus": modus,
         "bemanning": bemanning_cfg,
         "antall_ansatte": len(ansatte),
         "ansatte_kilde": ansatte_kilde,
@@ -198,10 +209,19 @@ class Handler(BaseHTTPRequestHandler):
                 rader = [ansatte_lager.til_rad(a) for a in lagrede]
             else:
                 kilde = "demo"
-                defs = skift_defs_for(False)
-                pool = bygg_ansatte(bygg_behov(standard_bemanning(), defs), defs)
+                defs = skift_lager.skift_defs_for(False)
+                pool = bygg_ansatte(bygg_behov(standard_bemanning(defs), defs), defs)
                 rader = [ansatte_lager.til_rad(a) for a in pool]
             resultat = {"kilde": kilde, "modaliteter": MODALITETER, "ansatte": rader}
+            self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+        elif self.path == "/api/skift":
+            lagrede = skift_lager.les_lagrede()
+            defs = lagrede or skift_lager.standard()
+            resultat = {
+                "kilde": "lagret" if lagrede else "standard",
+                "versjon": VERSJON,
+                "skift": [skift_lager.til_rad(d) for d in defs],
+            }
             self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         else:
             self._send(404, b"ikke funnet", "text/plain; charset=utf-8")
@@ -216,7 +236,14 @@ class Handler(BaseHTTPRequestHandler):
                 dager = max(1, min(int(data.get("dager", 14)), 84))
                 norm = float(data.get("uke_time_norm", 40) or 40)
                 norm = max(20.0, min(40.0, norm))
-                resultat = generer_json(start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm)
+                skift_defs = skift_lager.parse_liste(data["skift"]) if data.get("skift") else None
+                resultat = generer_json(
+                    start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm, skift_defs
+                )
+            elif self.path == "/api/skift":
+                data = json.loads(kropp)
+                antall, defs = skift_lager.lagre(data)
+                resultat = {"ok": True, "antall": antall, "skift": [skift_lager.til_rad(d) for d in defs]}
             elif self.path == "/api/ansatte":
                 data = json.loads(kropp)
                 antall, advarsler = ansatte_lager.lagre(data)
