@@ -44,9 +44,10 @@ class TurnusGenerator:
     def generer(self) -> Plan:
         for i in range(self.antall_dager):
             dato = self.start_dato + timedelta(days=i)
+            kategori = "helg" if dato.weekday() >= 5 else "hverdag"
             for skift_def in self.skift_defs:
                 skift = Skift(dato, skift_def)
-                for krav in self.behov.get(skift_def.navn, []):
+                for krav in self.behov.get(kategori, {}).get(skift_def.navn, []):
                     for _ in range(krav.antall):
                         self._fyll(skift, krav)
         return Plan(dict(self._plan), list(self._udekket))

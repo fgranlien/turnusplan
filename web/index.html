@@ -45,9 +45,12 @@ p { font-size:14px; }
     <div class="rad">
       <label>Startdato <input type="date" id="start" value="2025-03-03"></label>
       <label>Antall dager <input type="number" id="dager" value="14" min="7" max="84" step="7"></label>
-      <label class="sjekk"><input type="checkbox" id="langvakter"> 12-timers langvakter</label>
+      <label class="sjekk"><input type="checkbox" id="langvakter" onchange="renderBemanning()"> 12-timers langvakter</label>
       <button id="generer-knapp" onclick="generer()">Generer forslag</button>
     </div>
+    <h3>Bemanning per skift</h3>
+    <div id="bemanning"></div>
+    <p class="laster">Antall personer per skift. Hverdag = man–fre, helg = lør–søn. Fordelingen mellom kompetanser (leder/sykepleier/assistent) skalerer automatisk, og antall ansatte beregnes ut fra behovet.</p>
   </section>
   <section class="card">
     <h2>Valider eksisterende turnus (iCal fra Minarbeidsplan)</h2>
@@ -62,6 +65,27 @@ p { font-size:14px; }
 <script>
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+function skiftNavn() {
+  return document.getElementById('langvakter').checked ? ['DAG12', 'NATT12'] : ['DAG', 'KVELD', 'NATT'];
+}
+
+function renderBemanning() {
+  let html = '<table><tr><th>Skift</th><th>Hverdag (man–fre)</th><th>Helg (lør–søn)</th></tr>';
+  for (const s of skiftNavn()) {
+    html += `<tr><td class="skift-navn">${s}</td>` +
+      `<td><input type="number" id="bem-${s}-hverdag" value="4" min="1" max="12"></td>` +
+      `<td><input type="number" id="bem-${s}-helg" value="3" min="1" max="12"></td></tr>`;
+  }
+  document.getElementById('bemanning').innerHTML = html + '</table>';
+}
+
+function hentBemanning() {
+  const les = kat => Object.fromEntries(skiftNavn().map(s => [s, Math.max(1, Math.min(12, +document.getElementById(`bem-${s}-${kat}`).value || 1))]));
+  return {hverdag: les('hverdag'), helg: les('helg')};
+}
+
+renderBemanning();
+
 async function generer() {
   const knapp = document.getElementById('generer-knapp');
   knapp.disabled = true; knapp.textContent = 'Genererer …';
@@ -69,7 +93,8 @@ async function generer() {
     const r = await fetch('/api/generer', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({start: document.getElementById('start').value,
                             dager: +document.getElementById('dager').value,
-                            langvakter: document.getElementById('langvakter').checked})});
+                            langvakter: document.getElementById('langvakter').checked,
+                            bemanning: hentBemanning()})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
     visGenerert(data);
@@ -81,6 +106,8 @@ async function generer() {
 
 function visGenerert(d) {
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
+  const b = d.bemanning;
+  html += `<p class="laster">${d.antall_ansatte} ansatte · Bemanning per skift: hverdag ${Object.values(b.hverdag).join('/')} · helg ${Object.values(b.helg).join('/')}</p>`;
   html += '<table><tr><th>Dag</th><th>Skift</th><th>Bemanning</th></tr>';
   for (const dag of d.dager) for (const skift of dag.skift) {
     const navn = skift.bemanning.map(p => `<span class="pill ${esc(p.kompetanse)}">${esc(p.navn)}</span>`).join('');

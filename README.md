@@ -29,7 +29,20 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 127.0.0.1, ingenting eksponeres mot nettet). Fra GUI-et kan du:
 
 - Generere turnusforslag (velg startdato, lengde og 8 t/12 t-modus)
+- Stille inn bemanning per skift, atskilt for hverdag (man–fre) og helg (lør–søn)
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
+
+Antall ansatte beregnes automatisk ut fra bemanningsbehovet (dimensjonert etter
+timer per uke og nattbehov), og fordelingen mellom leder/sykepleier/assistent
+skalerer med bemanningen (ca. 25/25/50 %, alltid minst én leder og én
+sykepleier per skift).
+
+I kommandolinjen styres bemanningen slik:
+
+```bash
+python3 main.py --bemanning-hverdag 6 --bemanning-helg 3 --dager 28
+python3 main.py --langvakter --bemanning-hverdag 5 --bemanning-helg 3
+```
 
 ### Valider din eksisterende turnus (iCal fra Minarbeidsplan)
 

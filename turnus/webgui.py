@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from . import regler
-from .demo_data import demo_ansatte, demo_behov, demo_behov_langvakt, skift_defs_for
+from .demo_data import bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
 from .generator import TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
 from .modeller import Skift
@@ -19,10 +19,14 @@ WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
 
 
-def generer_json(start: date, antall_dager: int, langvakter: bool) -> dict:
-    ansatte = demo_ansatte()
-    behov = demo_behov_langvakt() if langvakter else demo_behov()
+def generer_json(start: date, antall_dager: int, langvakter: bool, bemanning: dict | None = None) -> dict:
     defs = skift_defs_for(langvakter)
+    standard_hverdag, standard_helg = standard_bemanning(langvakter)
+    bemanning = bemanning or {}
+    hverdag = {d.navn: int(bemanning.get("hverdag", {}).get(d.navn, standard_hverdag[d.navn])) for d in defs}
+    helg = {d.navn: int(bemanning.get("helg", {}).get(d.navn, standard_helg[d.navn])) for d in defs}
+    behov = bygg_behov(hverdag, helg)
+    ansatte = bygg_ansatte(behov, defs)
     plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True).generer()
     med_id = {a.id: a for a in ansatte}
 
@@ -70,6 +74,8 @@ def generer_json(start: date, antall_dager: int, langvakter: bool) -> dict:
 
     return {
         "modus": "langvakter 12 t" if langvakter else "tredelt turnus 8 t",
+        "bemanning": {"hverdag": hverdag, "helg": helg},
+        "antall_ansatte": len(ansatte),
         "periode": {
             "start": start.isoformat(),
             "slutt": (start + timedelta(days=antall_dager - 1)).isoformat(),
@@ -127,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.loads(kropp)
                 start = date.fromisoformat(data["start"])
                 dager = max(1, min(int(data.get("dager", 14)), 84))
-                resultat = generer_json(start, dager, bool(data.get("langvakter")))
+                resultat = generer_json(start, dager, bool(data.get("langvakter")), data.get("bemanning"))
             elif self.path.startswith("/api/valider"):
                 spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                 filnavn = spørring.get("filnavn", ["turnus.ics"])[0]

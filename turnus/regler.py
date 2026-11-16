@@ -182,9 +182,10 @@ def valider_plan(
 
     for i in range(antall_dager):
         dato = start_dato + timedelta(days=i)
+        kategori = "helg" if dato.weekday() >= 5 else "hverdag"
         for skift_def in skift_defs:
             skift = Skift(dato, skift_def)
-            for krav in behov.get(skift_def.navn, []):
+            for krav in behov.get(kategori, {}).get(skift_def.navn, []):
                 antall = sum(
                     1
                     for a_id, skift_liste in tildelinger.items()

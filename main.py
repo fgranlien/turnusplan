@@ -5,7 +5,7 @@ import argparse
 from datetime import date, timedelta
 
 from turnus import regler
-from turnus.demo_data import demo_ansatte, demo_behov, demo_behov_langvakt, skift_defs_for
+from turnus.demo_data import bygg_ansatte, bygg_behov, skift_defs_for, standard_bemanning
 from turnus.generator import TurnusGenerator
 from turnus.ics_import import les_ics
 from turnus.modeller import Skift, SkiftDef
@@ -62,6 +62,8 @@ def main() -> None:
     parser.add_argument("--start", default="2025-03-03", help="Startdato (ÅÅÅÅ-MM-DD, må være mandag)")
     parser.add_argument("--dager", type=int, default=14, help="Antall dager i horisonten")
     parser.add_argument("--langvakter", action="store_true", help="Bruk 12-timers langvakter (dag 07-19, natt 19-07)")
+    parser.add_argument("--bemanning-hverdag", type=int, default=None, metavar="N", help="Antall personer per skift på hverdager (man-fre)")
+    parser.add_argument("--bemanning-helg", type=int, default=None, metavar="N", help="Antall personer per skift i helgen (lør-søn)")
     parser.add_argument("--gui", action="store_true", help="Start grafisk grensesnitt i nettleseren")
     parser.add_argument("--port", type=int, default=8765, help="Port for GUI-et (standard 8765)")
     parser.add_argument("--valider-fil", metavar="FIL.ICS", help="Valider en eksisterende turnus i iCal-format i stedet for å generere")
@@ -82,9 +84,12 @@ def main() -> None:
     antall_dager = args.dager
     langvakt_avtale = True
 
-    ansatte = demo_ansatte()
-    behov = demo_behov_langvakt() if args.langvakter else demo_behov()
     skift_defs = skift_defs_for(args.langvakter)
+    standard_hverdag, standard_helg = standard_bemanning(args.langvakter)
+    hverdag = {n: args.bemanning_hverdag or standard_hverdag[n] for n in standard_hverdag}
+    helg = {n: args.bemanning_helg or standard_helg[n] for n in standard_helg}
+    behov = bygg_behov(hverdag, helg)
+    ansatte = bygg_ansatte(behov, skift_defs)
 
     plan = TurnusGenerator(ansatte, behov, start, antall_dager, skift_defs, langvakt_avtale).generer()
     ansatt_med_id = {a.id: a for a in ansatte}
