@@ -3,6 +3,17 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.10 – Vaktbytte mellom ansatte
+
+- Nytt «Vaktbytte»-kort i Turnus-fanen: velg «Fra», «Til», dato og skift
+- Har mottakeren en vakt samme dag byttes de to vaktene; ellers overtar
+  mottakeren vakten
+- Byttet gjennomføres bare hvis alt fortsatt er lovlig: døgnhvile 11 t,
+  ukeshvile 35 t, uketimer, natteserier, skiftlengde, kompetanse/dekning og
+  ferie/fravær – ellers vises en liste over regelbruddene og planen endres ikke
+- Etter gjennomført bytte oppdateres matrisen, oppsummeringen og
+  iCal-eksportene automatisk
+
 ## 2.9 – Ferie og fravær per ansatt
 
 - Ny «Ferie/fravær»-kolonne i Ansatte-fanen

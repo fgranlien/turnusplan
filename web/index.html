@@ -642,6 +642,7 @@ function visGenerert(d) {
   }
   html += visUkeMatrix(d);
   html += visTariff(d);
+  html += visVaktbytte(d);
   const rot = d.rotasjon && d.rotasjon.aktiv;
   html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th>' + (rot ? '<th>Gruppe</th>' : '') + '<th>iCal</th></tr>';
   for (const a of d.ansatte) html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}</td><td>${a.natt}</td>${rot ? `<td>${a.rotasjonsgruppe || ''}</td>` : ''}<td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
@@ -661,6 +662,42 @@ function visGenerert(d) {
   html += '</table>';
   html += valideringHtml(d.validering, 'generert forslag');
   document.getElementById('resultat').innerHTML = html + '</section>';
+}
+
+function visVaktbytte(d) {
+  const navn = d.ansatte.map(a => `<option value="${esc(a.navn)}">${esc(a.navn)}</option>`).join('');
+  const skift = Object.keys(d.bemanning).map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  return `<h3>Vaktbytte</h3><div class="rad">
+    <label>Fra <select id="bytt-a">${navn}</select></label>
+    <label>Til <select id="bytt-b">${navn}</select></label>
+    <label>Dato <input type="date" id="bytt-dato" min="${esc(d.periode.start)}" max="${esc(d.periode.slutt)}" value="${esc(d.periode.start)}"></label>
+    <label>Skift <select id="bytt-skift">${skift}</select></label>
+    <button class="liten" onclick="gjennomforBytte()">Foreslå og sjekk bytte</button>
+  </div><div id="bytt-status"></div>
+  <p class="laster">Har mottakeren en vakt samme dag byttes de to vaktene; ellers overtar mottakeren vakten. Byttet gjennomføres bare hvis døgnhvile, ukeshvile, uketimer, natteserier, kompetanse, fravær og dekning fortsatt er i orden.</p>`;
+}
+
+async function gjennomforBytte() {
+  const statusEl = document.getElementById('bytt-status');
+  try {
+    const r = await fetch('/api/vaktbytte', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({navn_a: document.getElementById('bytt-a').value,
+                            navn_b: document.getElementById('bytt-b').value,
+                            dato: document.getElementById('bytt-dato').value,
+                            skift: document.getElementById('bytt-skift').value})});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.feil || r.status);
+    if (!d.ok) {
+      let html = `<div class="status brudd">\u2717 Bytte avvist \u2013 ville gitt ${d.brudd.length} regelbrudd:<ul>`;
+      for (const f of d.brudd) html += `<li>${esc(f)}</li>`;
+      statusEl.innerHTML = html + '</ul></div>';
+      return;
+    }
+    visGenerert(d.resultat);
+    document.getElementById('bytt-status').innerHTML = `<div class="status ok">\u2713 ${esc(d.melding)}</div>`;
+  } catch (e) {
+    statusEl.innerHTML = `<div class="status brudd">Feil: ${esc(e.message)}</div>`;
+  }
 }
 
 function valideringHtml(feil, kontekst) {

@@ -13,7 +13,7 @@ from . import VERSJON, ansatte_lager, forvalg_lager, regler, skift_lager
 from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, standard_bemanning
 from .ics_export import bygg_ics
 from .modeller import SkiftDef
-from .generator import TurnusGenerator
+from .generator import Plan, TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
 from .modeller import Skift
 
@@ -21,6 +21,7 @@ WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
 
 _siste_eksport: dict[str, str] = {}
+_siste_plan: dict | None = None
 
 
 def generer_json(
@@ -55,6 +56,41 @@ def generer_json(
         ansatte_kilde = "demo"
     rotasjon_arg = (syklus_uker * 7, len(defs)) if rotasjon and syklus_uker > 0 else None
     plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg).generer()
+    global _siste_plan
+    _siste_plan = {
+        "tildelinger": plan.tildelinger,
+        "udekket": plan.udekket,
+        "ansatte": ansatte,
+        "behov": behov,
+        "bemanning": bemanning_cfg,
+        "start": start,
+        "antall_dager": antall_dager,
+        "defs": defs,
+        "uke_time_norm": uke_time_norm,
+        "rotasjon_arg": rotasjon_arg,
+        "ansatte_kilde": ansatte_kilde,
+    }
+    return _resultat_fra_plan(
+        plan, ansatte, behov, bemanning_cfg, start, antall_dager, defs,
+        uke_time_norm, rotasjon_arg, ansatte_kilde,
+    )
+
+
+def _resultat_fra_plan(
+    plan,
+    ansatte,
+    behov,
+    bemanning_cfg,
+    start,
+    antall_dager,
+    defs,
+    uke_time_norm,
+    rotasjon_arg,
+    ansatte_kilde,
+    udekket=None,
+):
+    if udekket is None:
+        udekket = plan.udekket
     med_id = {a.id: a for a in ansatte}
 
     uke_start = start - timedelta(days=start.weekday())
@@ -145,7 +181,7 @@ def generer_json(
     maks_var = max(d.varighet.total_seconds() / 3600 for d in defs)
     modus = "langvakter 12 t" if maks_var > 10 else "8-timers turnus"
     if rotasjon_arg:
-        modus += f" (rotasjonsrullering: {rotasjon_arg[1]} grupper, {syklus_uker} ukers syklus)"
+        modus += f" (rotasjonsrullering: {rotasjon_arg[1]} grupper, {rotasjon_arg[0] // 7} ukers syklus)"
     resultat = {
         "modus": modus,
         "bemanning": bemanning_cfg,
@@ -157,7 +193,7 @@ def generer_json(
         },
         "rotasjon": {
             "aktiv": rotasjon_arg is not None,
-            "syklus_uker": syklus_uker,
+            "syklus_uker": (rotasjon_arg[0] // 7) if rotasjon_arg else 0,
             "grupper": rotasjon_arg[1] if rotasjon_arg else 0,
         },
         "dager": dager,
@@ -179,7 +215,7 @@ def generer_json(
         },
         "udekket": [
             {"skift": s.etikett, "dato": s.dato.isoformat(), "kompetanse": k.kompetanse}
-            for s, k in plan.udekket
+            for s, k in udekket
         ],
         "validering": feil,
         "ics": bygg_ics(plan.tildelinger, ansatte, defs, f"Turnusforslag {start.isoformat()}")
@@ -196,6 +232,69 @@ def generer_json(
             f"Turnus {a.navn} {start.isoformat()}",
         )
     return resultat
+
+
+def vaktbytte_json(navn_a: str, navn_b: str, dato_iso: str, skift_navn: str) -> dict:
+    if not _siste_plan:
+        raise ValueError("Generer en turnus først")
+    ctx = _siste_plan
+    dato = date.fromisoformat(dato_iso)
+    if not ctx["start"] <= dato < ctx["start"] + timedelta(days=ctx["antall_dager"]):
+        raise ValueError("Datoen er utenfor den genererte perioden")
+    med_navn = {a.navn: a for a in ctx["ansatte"]}
+    if navn_a not in med_navn or navn_b not in med_navn:
+        raise ValueError("Ukjent ansatt")
+    if navn_a == navn_b:
+        raise ValueError("Velg to ulike ansatte")
+    a, b = med_navn[navn_a], med_navn[navn_b]
+    skift_def = next((d for d in ctx["defs"] if d.navn == skift_navn), None)
+    if skift_def is None:
+        raise ValueError(f"Ukjent skift '{skift_navn}'")
+    kategori = "helg" if dato.weekday() >= 5 else "hverdag"
+    if kategori not in skift_def.dager:
+        raise ValueError(f"{skift_navn} går ikke den dagen")
+    skift = Skift(dato, skift_def)
+
+    liste_a = ctx["tildelinger"].get(a.id, [])
+    liste_b = ctx["tildelinger"].get(b.id, [])
+    if skift not in liste_a:
+        raise ValueError(f"{a.navn} har ikke {skift_navn} {dato_iso}")
+    skift_b = next((s for s in liste_b if s.dato == dato), None)
+
+    if skift.dato in b.utilgjengelige_dager:
+        raise ValueError(f"{b.navn} er utilgjengelig {dato_iso}")
+    if skift_b is not None and skift_b.dato in a.utilgjengelige_dager:
+        raise ValueError(f"{a.navn} er utilgjengelig {dato_iso}")
+
+    ny_a = [s for s in liste_a if s != skift]
+    ny_b = [s for s in liste_b if skift_b is None or s != skift_b]
+    if skift_b is not None:
+        ny_a.append(skift_b)
+    ny_b.append(skift)
+
+    nye_tildelinger = {aid: list(v) for aid, v in ctx["tildelinger"].items()}
+    nye_tildelinger[a.id] = sorted(ny_a)
+    nye_tildelinger[b.id] = sorted(ny_b)
+
+    feil = regler.valider_plan(
+        nye_tildelinger, ctx["ansatte"], ctx["behov"], ctx["start"],
+        ctx["antall_dager"], ctx["defs"], True,
+    )
+    if feil:
+        return {"ok": False, "brudd": feil}
+
+    ctx["tildelinger"] = nye_tildelinger
+    plan = Plan(dict(nye_tildelinger), list(ctx["udekket"]))
+    resultat = _resultat_fra_plan(
+        plan, ctx["ansatte"], ctx["behov"], ctx["bemanning"], ctx["start"],
+        ctx["antall_dager"], ctx["defs"], ctx["uke_time_norm"],
+        ctx["rotasjon_arg"], ctx["ansatte_kilde"], ctx["udekket"],
+    )
+    if skift_b is not None:
+        melding = f"{navn_a} og {navn_b} byttet vakter {dato_iso}: {skift_navn} mot {skift_b.type.navn}"
+    else:
+        melding = f"{navn_b} overtok {skift_navn} {dato_iso} fra {navn_a}"
+    return {"ok": True, "melding": melding, "resultat": resultat}
 
 
 def valider_json(tekst: str, filnavn: str, stillingsprosent: float) -> dict:
@@ -308,6 +407,14 @@ class Handler(BaseHTTPRequestHandler):
                 if isinstance(ansatte, list) and ansatte:
                     ansatte_lager.lagre(ansatte)
                 resultat = {"ok": True, "profil": profil}
+            elif self.path == "/api/vaktbytte":
+                data = json.loads(kropp)
+                resultat = vaktbytte_json(
+                    str(data.get("navn_a", "")).strip(),
+                    str(data.get("navn_b", "")).strip(),
+                    str(data.get("dato", "")).strip(),
+                    str(data.get("skift", "")).strip(),
+                )
             elif self.path == "/api/ansatte":
                 data = json.loads(kropp)
                 antall, advarsler = ansatte_lager.lagre(data)

@@ -39,6 +39,9 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - Redigere ansatte direkte: navn, yrkesgruppe, modaliteter, stillingsprosent
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
+- **Vaktbytte mellom ansatte** i Turnus-fanen – bytte eller overtagelse av en
+  vakt, kun gjennomført hvis alle aml-regler, kompetanse og dekning fortsatt
+  stemmer
 - **Ferie/fravær per ansatt**: enkelt datoer eller intervaller
   («2025-07-01 til 2025-07-14») i Ansatte-fanen – generatoren tildeler ingen
   vakter disse dagene
