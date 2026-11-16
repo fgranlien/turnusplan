@@ -3,6 +3,17 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.16 – Tilvalg for 12-timersvakter per ansatt
+
+- Ny kolonne «12-t vakter/uke» i Ansatte-fanen: hvor mange 12-timersvakter
+  (DAG12/NATT12 e.l.) den ansatte ønsker per uke
+  – tom = ingen begrensning, 0 = ønsker ikke 12-timersvakter
+- Tilvalget håndheves av begge motorene: greedy (via lovighetssjekken) og
+  CP-SAT (egen ukentlig begrensning)
+- Vaktbytte avvises hvis byttet ville gitt den mottakende ansatte flere
+  12-timersvakter i uka enn tilvalget
+- Lagres i ansatte.json sammen med resten av ansettelisten
+
 ## 2.15 – Feilretting: fanene i GUI-et
 
 - Faneknappene (Generer/Turnus/Ansatte/Valider iCal) fungerte ikke ved klikk:

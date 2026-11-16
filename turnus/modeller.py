@@ -58,6 +58,7 @@ class Ansatt:
     foretrekker: set[SkiftDef] = field(default_factory=set)
     unnga: set[SkiftDef] = field(default_factory=set)
     utilgjengelige_dager: set[date] = field(default_factory=set)
+    langvakt_uke_maks: int | None = None
 
 
 @dataclass(frozen=True)

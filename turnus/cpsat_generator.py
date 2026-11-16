@@ -143,6 +143,26 @@ def loes_med_cpsat(
             if uke_vars:
                 model.Add(sum(uke_vars) <= round(grense * 60))
 
+    for a in ansatte:
+        if a.langvakt_uke_maks is None:
+            continue
+        for u in range(antall_uker):
+            ws = uker_start + timedelta(days=7 * u)
+            lange = []
+            for j in range(7):
+                d = ws + timedelta(days=j)
+                if d not in datoer_set:
+                    continue
+                for sd in skift_defs:
+                    if (
+                        kategori[d] in sd.dager
+                        and sd.varighet.total_seconds() / 3600 > regler.MAKS_TIMER_PER_DOGN_UTVIDET
+                        and (a.id, d, sd.navn) in x
+                    ):
+                        lange.append(x[a.id, d, sd.navn])
+            if lange:
+                model.Add(sum(lange) <= a.langvakt_uke_maks)
+
     def matcher(onsker: set[SkiftDef], sd: SkiftDef) -> bool:
         return sd in onsker or (NATT in onsker and sd.er_natt)
 

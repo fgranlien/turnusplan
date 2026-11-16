@@ -64,6 +64,17 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
     prosent = max(10.0, min(100.0, prosent))
     foretrekker = {d for d in (_skift_def(s) for s in rad.get("foretrekker") or []) if d}
     unnga = {d for d in (_skift_def(s) for s in rad.get("unnga") or []) if d}
+    raa_langvakt = rad.get("langvakt_uke_maks")
+    if raa_langvakt is None or str(raa_langvakt).strip() == "":
+        langvakt_maks = None
+    else:
+        try:
+            langvakt_maks = max(0, min(7, int(raa_langvakt)))
+        except (TypeError, ValueError):
+            langvakt_maks = None
+            advarsler.append(
+                f"{navn}: ugjenkjennelig antall 12-timersvakter '{raa_langvakt}' (ignorerer tilvalget)"
+            )
     utilgjengelige: set[date] = set()
     for s in rad.get("utilgjengelige_dager") or []:
         datoer, feil = _utvid_datoer(str(s))
@@ -87,6 +98,7 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
         foretrekker,
         unnga,
         utilgjengelige,
+        langvakt_maks,
     )
     return ansatt, advarsler
 
@@ -102,6 +114,7 @@ def til_rad(a: Ansatt) -> dict:
         "foretrekker": sorted(d.navn for d in a.foretrekker),
         "unnga": sorted(d.navn for d in a.unnga),
         "utilgjengelige_dager": sorted(d.isoformat() for d in a.utilgjengelige_dager),
+        "langvakt_uke_maks": a.langvakt_uke_maks,
     }
 
 

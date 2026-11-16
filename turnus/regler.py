@@ -123,6 +123,20 @@ def uketimer_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) -> b
     return timer <= grense + 1e-9
 
 
+def langvakt_uke_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) -> bool:
+    if ansatt.langvakt_uke_maks is None:
+        return True
+    uke_start = kandidat.dato - timedelta(days=kandidat.dato.weekday())
+    uke_slutt = uke_start + UKELANGD
+    antall = sum(
+        1 for s in eksisterende
+        if uke_start <= s.dato < uke_slutt and _timer(s) > MAKS_TIMER_PER_DOGN_UTVIDET
+    )
+    if _timer(kandidat) > MAKS_TIMER_PER_DOGN_UTVIDET:
+        antall += 1
+    return antall <= ansatt.langvakt_uke_maks
+
+
 def natteserie_lengde(skift_liste: list[Skift], dato: date) -> int:
     natt_dager = {s.dato for s in skift_liste if s.type.er_natt}
     lengde = 0
@@ -146,6 +160,8 @@ def kandidat_er_lovlig(
     if not dognhvile_ok(eksisterende, kandidat):
         return False
     if not uketimer_ok(ansatt, eksisterende, kandidat):
+        return False
+    if not langvakt_uke_ok(ansatt, eksisterende, kandidat):
         return False
     if kandidat.type.er_natt and natteserie_lengde(eksisterende, kandidat.dato) >= MAKS_NATTER_ONK:
         return False
@@ -281,6 +297,19 @@ def valider_plan(
             timer = sum(_timer(s) for s in sortert if _midnatt(ws) <= s.start < _midnatt(ws) + UKELANGD)
             if timer > grense + 1e-9:
                 feil.append(f"Uketimer: {ansatt.navn} har {timer:.1f} t i uke {ws.isocalendar()[1]} (grense {grense:.0f} t)")
+
+        if ansatt.langvakt_uke_maks is not None:
+            for u in range(antall_dager // 7 + 2):
+                ws = uke_start + timedelta(days=7 * u)
+                lange = sum(
+                    1 for s in sortert
+                    if ws <= s.dato < ws + UKELANGD and _timer(s) > MAKS_TIMER_PER_DOGN_UTVIDET
+                )
+                if lange > ansatt.langvakt_uke_maks:
+                    feil.append(
+                        f"Langvaktstilvalg: {ansatt.navn} har {lange} 12-timersvakter i uke "
+                        f"{ws.isocalendar()[1]} (tilvalg {ansatt.langvakt_uke_maks})"
+                    )
 
         natt_dager = sorted(s.dato for s in sortert if s.type.er_natt)
         lengde = 0
