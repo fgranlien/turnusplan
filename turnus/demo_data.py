@@ -101,8 +101,9 @@ def bygg_ansatte(behov: dict[str, dict[str, list[Krav]]], skift_defs: list[Skift
 
     if timer.get("fagradiograf", 0) > 0:
         antall = _pool_storrelse(timer["fagradiograf"], natt.get("fagradiograf", 0.0), skift_defs)
-        for _ in range(antall):
-            ansatt = Ansatt(f"a{id_teller}", unikt_navn("fagradiograf"), {"fagradiograf", *aktive_modaliteter})
+        for i in range(antall):
+            modalitet = aktive_modaliteter[i % len(aktive_modaliteter)] if aktive_modaliteter else "Røntgen"
+            ansatt = Ansatt(f"a{id_teller}", unikt_navn("fagradiograf"), {"fagradiograf", modalitet})
             if id_teller % 4 == 0:
                 ansatt.unnga = {NATT}
             elif id_teller % 4 == 2:

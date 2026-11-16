@@ -41,8 +41,8 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - Laste opp en `.ics`-fil fra Minarbeidsplan og validere den mot aml
 
 Uten `ansatte.json` dimensjoneres demopoolen automatisk etter timer per uke og
-nattbehov. Fagradiografer prioriteres til fagradiograf-plassene og brukes som
-reserve for modalitetsplasser når radiografene tar slut.
+nattbehov. Fagradiografer prioriteres til fagradiograf-plassene og kan i tillegg
+dekke plasser innenfor sin hovedmodalitet når radiografene tar slut.
 
 ### Valider din eksisterende turnus (iCal fra Minarbeidsplan)
 

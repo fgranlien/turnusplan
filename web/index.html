@@ -60,7 +60,7 @@ p { font-size:14px; }
       <button id="lagre-ansatte-knapp" onclick="lagreAnsatte()">Lagre ansatte</button>
     </div>
     <div id="ansatte-status"></div>
-    <p class="laster">Radiografer må ha minst én modalitet. Fagradiografer kan dekke alle modaliteter automatisk. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
+    <p class="laster">Radiografer må ha minst én modalitet. Fagradiografer er knyttet til én hovedmodalitet, og kan i tillegg dekte fagradiograf-plassene. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
   </section>
   <section class="card">
     <h2>Valider eksisterende turnus (iCal fra Minarbeidsplan)</h2>
@@ -155,7 +155,10 @@ function renderAnsatte() {
     const fagra = a.yrkesgruppe === 'fagradiograf';
     let modHtml;
     if (fagra) {
-      modHtml = '<span class="laster">alle modaliteter</span>';
+      const hoved = a.modaliteter[0] || '';
+      modHtml = '<select onchange="settHovedMod(' + i + ', this.value)">' +
+        MODALITETER.map(m => `<option value="${m}" ${hoved === m ? 'selected' : ''}>${m}</option>`).join('') +
+        '</select>';
     } else {
       modHtml = MODALITETER.map(m =>
         `<label class="sjekk" style="padding:0;gap:4px;margin-right:10px;font-size:12.5px"><input type="checkbox" ${a.modaliteter.includes(m) ? 'checked' : ''} onchange="settMod(${i}, '${m}', this.checked)"> ${m}</label>`
@@ -194,9 +197,16 @@ function settMod(i, m, valgt) {
 
 function settGruppe(i, gruppe) {
   ansatteListe[i].yrkesgruppe = gruppe;
-  if (gruppe === 'fagradiograf') ansatteListe[i].modaliteter = MODALITETER.slice();
+  if (gruppe === 'fagradiograf') {
+    const hoved = ansatteListe[i].modaliteter[0] || 'Røntgen';
+    ansatteListe[i].modaliteter = [hoved];
+  } else if (!ansatteListe[i].modaliteter.length) {
+    ansatteListe[i].modaliteter = ['Røntgen'];
+  }
   renderAnsatte();
 }
+
+function settHovedMod(i, m) { ansatteListe[i].modaliteter = [m]; }
 
 function settPref(i, felt, verdi) { ansatteListe[i][felt] = verdi ? [verdi] : []; }
 

@@ -32,9 +32,11 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
     if gruppe == "radiograf" and not modaliteter:
         raise AnsattFeil(f"{navn}: radiograf må ha minst én modalitet")
     if gruppe == "fagradiograf":
-        if modaliteter and modaliteter != sorted(MODALITETER):
-            advarsler.append(f"{navn}: fagradiograf får automatisk alle modaliteter")
-        modaliteter = sorted(MODALITETER)
+        if not modaliteter:
+            raise AnsattFeil(f"{navn}: fagradiograf må ha en hovedmodalitet")
+        if len(modaliteter) > 1:
+            advarsler.append(f"{navn}: fagradiograf er knyttet til én modalitet – bruker {modaliteter[0]}")
+            modaliteter = modaliteter[:1]
     try:
         prosent = float(rad.get("stillingsprosent", 100) or 100)
     except (TypeError, ValueError):
