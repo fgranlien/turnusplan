@@ -13,6 +13,7 @@ from . import VERSJON, ansatte_lager, forvalg_lager, regler, skift_lager
 from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, standard_bemanning
 from .ics_export import bygg_ics
 from .modeller import SkiftDef
+from .cpsat_generator import loes_med_cpsat, tilgjengelig as cpsat_tilgjengelig
 from .generator import Plan, TurnusGenerator
 from .ics_import import les_ics, les_ics_tekst
 from .modeller import Skift
@@ -33,6 +34,7 @@ def generer_json(
     skift_defs: list[SkiftDef] | None = None,
     rotasjon: bool = False,
     syklus_uker: int = 4,
+    motor: str = "greedy",
 ) -> dict:
     defs = skift_defs if skift_defs is not None else skift_lager.skift_defs_for(langvakter)
     bemanning_cfg = standard_bemanning(defs)
@@ -55,7 +57,27 @@ def generer_json(
         ansatte = bygg_ansatte(behov, defs)
         ansatte_kilde = "demo"
     rotasjon_arg = (syklus_uker * 7, len(defs)) if rotasjon and syklus_uker > 0 else None
-    plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg).generer()
+    motor_brukt = "greedy"
+    motor_status = ""
+    motor_tid = None
+    motor_merknad = ""
+    if motor == "cpsat" and not rotasjon_arg:
+        if not cpsat_tilgjengelig():
+            motor_merknad = "ortools er ikke installert (pip3 install ortools) \u2013 bruker greedy."
+        else:
+            los = loes_med_cpsat(ansatte, behov, start, antall_dager, defs, uke_time_norm)
+            if los is not None:
+                motor_brukt = "cpsat"
+                motor_status = los.status
+                motor_tid = round(los.losningstid, 2)
+                udekket_liste = _udekket_for(los.tildelinger, ansatte, behov, start, antall_dager, defs)
+                plan = Plan(los.tildelinger, udekket_liste)
+            else:
+                motor_merknad = "CP-SAT fant ingen gjennomf\u00f8rbar l\u00f8sning innen tidsbegrensningen \u2013 bruker greedy."
+    elif motor == "cpsat" and rotasjon_arg:
+        motor_merknad = "Rotasjonsrullering st\u00f8ttes forel\u00f8pig bare av greedy-motoren."
+    if motor_brukt == "greedy":
+        plan = TurnusGenerator(ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg).generer()
     global _siste_plan
     _siste_plan = {
         "tildelinger": plan.tildelinger,
@@ -70,9 +92,10 @@ def generer_json(
         "rotasjon_arg": rotasjon_arg,
         "ansatte_kilde": ansatte_kilde,
     }
+    motor_info = {"navn": motor_brukt, "status": motor_status, "tid": motor_tid, "merknad": motor_merknad}
     return _resultat_fra_plan(
         plan, ansatte, behov, bemanning_cfg, start, antall_dager, defs,
-        uke_time_norm, rotasjon_arg, ansatte_kilde,
+        uke_time_norm, rotasjon_arg, ansatte_kilde, motor_info=motor_info,
     )
 
 
@@ -88,9 +111,12 @@ def _resultat_fra_plan(
     rotasjon_arg,
     ansatte_kilde,
     udekket=None,
+    motor_info=None,
 ):
     if udekket is None:
         udekket = plan.udekket
+    if motor_info is None:
+        motor_info = {"navn": "greedy", "status": "", "tid": None, "merknad": ""}
     med_id = {a.id: a for a in ansatte}
 
     uke_start = start - timedelta(days=start.weekday())
@@ -196,6 +222,7 @@ def _resultat_fra_plan(
             "syklus_uker": (rotasjon_arg[0] // 7) if rotasjon_arg else 0,
             "grupper": rotasjon_arg[1] if rotasjon_arg else 0,
         },
+        "motor": motor_info,
         "dager": dager,
         "ansatte": ansatt_rader,
         "preferanser": {"innfridd": pref_innfridd, "totalt": pref_totalt},
@@ -232,6 +259,26 @@ def _resultat_fra_plan(
             f"Turnus {a.navn} {start.isoformat()}",
         )
     return resultat
+
+
+def _udekket_for(tildelinger, ansatte, behov, start, antall_dager, defs) -> list:
+    med_id = {a.id: a for a in ansatte}
+    udekket = []
+    for i in range(antall_dager):
+        dato = start + timedelta(days=i)
+        kat = "helg" if dato.weekday() >= 5 else "hverdag"
+        for sd in defs:
+            if kat not in sd.dager:
+                continue
+            skift = Skift(dato, sd)
+            for krav in behov.get(kat, {}).get(sd.navn, []):
+                antall = sum(
+                    1 for aid, sl in tildelinger.items()
+                    if skift in sl and krav.kompetanse in med_id[aid].kompetanse
+                )
+                for _ in range(max(0, krav.antall - antall)):
+                    udekket.append((skift, krav))
+    return udekket
 
 
 def vaktbytte_json(navn_a: str, navn_b: str, dato_iso: str, skift_navn: str) -> dict:
@@ -384,6 +431,7 @@ class Handler(BaseHTTPRequestHandler):
                 resultat = generer_json(
                     start, dager, bool(data.get("langvakter")), data.get("bemanning"), norm, skift_defs,
                     bool(data.get("rotasjon")), int(data.get("syklus_uker", 4) or 4),
+                    str(data.get("motor", "greedy")),
                 )
             elif self.path == "/api/skift":
                 data = json.loads(kropp)

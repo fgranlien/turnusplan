@@ -3,6 +3,20 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.12 – Nøyaktig planmotor (OR-Tools CP-SAT)
+
+- Ny «Motor»-velger i Generer-fanen: Rask (greedy) eller Nøyaktig (CP-SAT)
+- CP-SAT modellerer hele horisonten samtidig: dekning, døgnhvile, ukeshvile,
+  uketimer mot valgt norm, natteserier, ferie og preferanser – og finner en
+  bevist optimal løsning (status og løsningstid vises i Turnus-fanen)
+- Målfunksjonen vekter preferanser, rettferdig fordeling av vakter og natter,
+  og straff for fagradiograf på modalitetsplasser
+- Faller automatisk tilbake til greedy hvis `ortools` ikke er installert,
+  hvis ingen løsning finnes innen 30 sekunder, eller ved rotasjonsrullering
+  (støttes kun av greedy) – med forklarende merknad i resultatet
+- Valgfri installasjon på Mac: `pip3 install ortools` – uten den fungerer
+  alt som før med greedy
+
 ## 2.11 – Utskrift og PDF
 
 - «Skriv ut / lagre som PDF»-knapp i Turnus-fanen

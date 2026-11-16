@@ -130,6 +130,12 @@ td.ute { background:#f0f1f3; }
           <option value="33.6">33,6 t – helkontinuerlig/sammenlignbart skiftarbeid</option>
         </select>
       </label>
+      <label>Motor
+        <select id="motor">
+          <option value="greedy">Rask (greedy)</option>
+          <option value="cpsat">Nøyaktig (CP-SAT)</option>
+        </select>
+      </label>
     </div>
     <div class="rad" style="margin-top:10px">
       <label class="sjekk"><input type="checkbox" id="rotasjon"> Rotasjonsrullering</label>
@@ -546,7 +552,8 @@ async function generer() {
                             bemanning: hentBemanning(),
                             uke_time_norm: +document.getElementById('norm').value,
                             rotasjon: document.getElementById('rotasjon').checked,
-                            syklus_uker: +document.getElementById('syklus').value || 4})});
+                            syklus_uker: +document.getElementById('syklus').value || 4,
+                            motor: document.getElementById('motor').value})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
     visGenerert(data);
@@ -664,6 +671,14 @@ function visGenerert(d) {
   html += '<div class="rad" style="margin-top:10px"><button onclick="lastNedIcs()">Last ned iCal (.ics)</button><button onclick="window.print()">Skriv ut / lagre som PDF</button><span class="laster">Importer i kalender eller Minarbeidsplan. Utskrift blir automatisk A4 landskap med kun turnusen.</span></div>';
   if (d.rotasjon && d.rotasjon.aktiv) {
     html += `<div class="status ok">Rotasjonsrullering aktiv: ${d.rotasjon.grupper} grupper roterer gjennom skiftene per ${d.rotasjon.syklus_uker}-ukers syklus. Personlige preferanser er deaktivert i rotasjonsmodus.</div>`;
+  }
+  if (d.motor) {
+    const m = d.motor;
+    let txt = m.navn === 'cpsat'
+      ? `Optimert med CP-SAT (${esc(m.status || 'løst')}${m.tid ? ', ' + m.tid + ' s' : ''})`
+      : 'Generert med rask greedy-motor';
+    if (m.merknad) txt += ' – ' + m.merknad;
+    html += `<p class="laster">${esc(txt)}</p>`;
   }
   html += visUkeMatrix(d);
   html += visTariff(d);
