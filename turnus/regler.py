@@ -123,6 +123,12 @@ def uketimer_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) -> b
     return timer <= grense + 1e-9
 
 
+def matcher(onsker: set[str], skift_def: SkiftDef) -> bool:
+    if skift_def.navn.upper() in onsker:
+        return True
+    return "NATT" in onsker and skift_def.er_natt
+
+
 _EPOCH_LORDAG = date(2020, 1, 4)
 
 
@@ -287,16 +293,28 @@ def valider_plan(
         kategori = "helg" if dato.weekday() >= 5 else "hverdag"
         for skift_def in skift_defs:
             skift = Skift(dato, skift_def)
-            for krav in behov.get(kategori, {}).get(skift_def.navn, []):
-                antall = sum(
-                    1
-                    for a_id, skift_liste in tildelinger.items()
-                    if skift in skift_liste and krav.kompetanse in ansatt_med_id[a_id].kompetanse
-                )
-                if antall < krav.antall:
+            krav_liste = [k for k in behov.get(kategori, {}).get(skift_def.navn, []) if k.antall > 0]
+            if not krav_liste:
+                continue
+            tildelte = [a_id for a_id, skift_liste in tildelinger.items() if skift in skift_liste]
+            kvalifiserte_totalt: set[str] = set()
+            for krav in krav_liste:
+                kvalifiserte = {
+                    a_id for a_id in tildelte
+                    if krav.kompetanse in ansatt_med_id[a_id].kompetanse
+                }
+                kvalifiserte_totalt |= kvalifiserte
+                if len(kvalifiserte) < krav.antall:
                     feil.append(
-                        f"Dekning: {skift.etikett} {dato:%d.%m} mangler {krav.antall - antall} med kompetanse '{krav.kompetanse}'"
+                        f"Dekning: {skift.etikett} {dato:%d.%m} mangler {krav.antall - len(kvalifiserte)} med kompetanse '{krav.kompetanse}'"
                     )
+            totalt_behov = sum(k.antall for k in krav_liste)
+            if len(kvalifiserte_totalt) < totalt_behov:
+                feil.append(
+                    f"Dekning: {skift.etikett} {dato:%d.%m} krever {totalt_behov} personer, "
+                    f"men bare {len(kvalifiserte_totalt)} kvalifiserte er tildelt "
+                    "(\u00e9n person kan ikke fylle to krav på samme skift)"
+                )
 
     for a_id, skift_liste in tildelinger.items():
         ansatt = ansatt_med_id[a_id]

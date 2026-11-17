@@ -55,8 +55,8 @@ class Ansatt:
     navn: str
     kompetanse: set[str]
     stillingsprosent: float = 100.0
-    foretrekker: set[SkiftDef] = field(default_factory=set)
-    unnga: set[SkiftDef] = field(default_factory=set)
+    foretrekker: set[str] = field(default_factory=set)
+    unnga: set[str] = field(default_factory=set)
     utilgjengelige_dager: set[date] = field(default_factory=set)
     langvakt_uke_maks: int | None = None
     helg_hver_n: int | None = None

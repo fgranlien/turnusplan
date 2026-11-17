@@ -74,23 +74,21 @@ def generer_json(
     motor_status = ""
     motor_tid = None
     motor_merknad = ""
-    if motor == "cpsat" and not rotasjon_arg and not laaste_par:
+    if motor == "cpsat" and not rotasjon_arg:
         if not cpsat_tilgjengelig():
             motor_merknad = "ortools er ikke installert (pip3 install ortools) \u2013 bruker greedy."
         else:
-            los = loes_med_cpsat(ansatte, behov, start, antall_dager, defs, uke_time_norm)
+            los = loes_med_cpsat(ansatte, behov, start, antall_dager, defs, uke_time_norm, laaste=laaste_par)
             if los is not None:
                 motor_brukt = "cpsat"
                 motor_status = los.status
                 motor_tid = round(los.losningstid, 2)
-                udekket_liste = _udekket_for(los.tildelinger, ansatte, behov, start, antall_dager, defs)
-                plan = Plan(los.tildelinger, udekket_liste)
+                plan = Plan(los.tildelinger, los.udekket, los.laaste_feilet)
+                laaste_avvist = list(laaste_avvist) + list(los.laaste_feilet)
             else:
                 motor_merknad = "CP-SAT fant ingen gjennomf\u00f8rbar l\u00f8sning innen tidsbegrensningen \u2013 bruker greedy."
     elif motor == "cpsat" and rotasjon_arg:
         motor_merknad = "Rotasjonsrullering st\u00f8ttes forel\u00f8pig bare av greedy-motoren."
-    elif motor == "cpsat" and laaste_par:
-        motor_merknad = "L\u00e5ste vakter st\u00f8ttes forel\u00f8pig bare av greedy-motoren."
     if motor_brukt == "greedy":
         plan = TurnusGenerator(
             ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg, laaste_par
@@ -293,10 +291,10 @@ def _resultat_fra_plan(
     pref_innfridd = pref_totalt = 0
     for a in ansatte:
         for s in plan.tildelinger[a.id]:
-            if TurnusGenerator._matcher(a.foretrekker, s):
+            if regler.matcher(a.foretrekker, s.type):
                 pref_innfridd += 1
                 pref_totalt += 1
-            elif TurnusGenerator._matcher(a.unnga, s):
+            elif regler.matcher(a.unnga, s.type):
                 pref_totalt += 1
 
     feil = regler.valider_plan(plan.tildelinger, ansatte, behov, start, antall_dager, defs, True)
@@ -366,26 +364,6 @@ def _resultat_fra_plan(
             f"Turnus {a.navn} {start.isoformat()}",
         )
     return resultat
-
-
-def _udekket_for(tildelinger, ansatte, behov, start, antall_dager, defs) -> list:
-    med_id = {a.id: a for a in ansatte}
-    udekket = []
-    for i in range(antall_dager):
-        dato = start + timedelta(days=i)
-        kat = "helg" if dato.weekday() >= 5 else "hverdag"
-        for sd in defs:
-            if kat not in sd.dager:
-                continue
-            skift = Skift(dato, sd)
-            for krav in behov.get(kat, {}).get(sd.navn, []):
-                antall = sum(
-                    1 for aid, sl in tildelinger.items()
-                    if skift in sl and krav.kompetanse in med_id[aid].kompetanse
-                )
-                for _ in range(max(0, krav.antall - antall)):
-                    udekket.append((skift, krav))
-    return udekket
 
 
 def vaktbytte_json(navn_a: str, navn_b: str, dato_iso: str, skift_navn: str) -> dict:

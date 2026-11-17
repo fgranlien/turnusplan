@@ -40,9 +40,14 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
 - **Nøyaktig planmotor (OR-Tools CP-SAT)** som valgfritt alternativ til den
-  raske greedy-motoren: modellerer hele horisonten samtidig og finner optimal
-  turnus innenfor modellens aml- og tariffregler (optimalitet verifiseres
-  innenfor modellen, ikke mot lovteksten). Installer valgfritt med
+  raske greedy-motoren: modellerer hele horisonten samtidig med en
+  plassmodell (hvert bemanningskrav er en egen plass som må fylles av én
+  kvalifisert person) og finner optimal turnus innenfor modellens aml- og
+  tariffregler (optimalitet verifiseres innenfor modellen, ikke mot
+  lovteksten). Ukegrensen er lov-taket (40 t × stillingsprosent), mens
+  tariffnormen (f.eks. 35,5 t) håndheves som snitt over hele perioden med
+  straff for avvik fra måltimer per ansatt. Udekket behov og avviste låste
+  vakter kommer direkte fra modellen. Installer valgfritt med
   `pip3 install ortools` – uten den brukes greedy automatisk
 - **Helgrullering per ansatt** – kolonnen «Helg hver N.» i Ansatte-fanen:
   3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helg; ansatte med samme
@@ -166,13 +171,22 @@ turnus/
   modeller.py    Ansatt, SkiftDef (konfigurerbare skifftyper), Skift, Krav
   regler.py      Harde regler fra aml + full planvalidering
   generator.py   Greedy-planlegger med poengberegning
+  cpsat_generator.py  CP-SAT-planlegger (plassmodell, snittnorm, slakk)
   ics_import.py  Import av iCal (.ics) og validering av eksisterende turnus
+  ics_export.py  Eksport av turnus og enkeltansatte til iCal (.ics)
+  skift_lager.py Lager/leser av egendefinerte skift (skift.json)
+  ansatte_lager.py  Lager/leser av ansatte (ansatte.json)
+  forvalg_lager.py  Lager/leser av forvalg (forvalg.json)
+  lager.py       Atomisk filskriving (tmp-fil + os.replace)
   webgui.py      Lokal webserver (127.0.0.1) med JSON-API for GUI-et
   demo_data.py   Modaliteter, yrkesgrupper og automatisk ansattdimensjonering
 web/
   index.html     Grensesnitt (vanilla HTML/JS, ingen avhengigheter)
 main.py          CLI (argparse) som genererer, validerer eller starter GUI
 run.sh           Kjøre-skript for Mac/Linux
+tests/
+  test_motorer.py  Unittests som kjører greedy og CP-SAT på samme input
+                   og krever at begge består samme regelvalidering
 ```
 
 ## Utvidelsespunkter
@@ -180,5 +194,6 @@ run.sh           Kjøre-skript for Mac/Linux
 - Egne skifftyper: legg til `SkiftDef` i `modeller.py` (start/slutt-time, `er_natt`)
 - Flere kompetanser per ansatt: fyll `kompetanse`-mengden
 - Lokale avtaler/tariff: legg til regler i `regler.py` og bruk dem i `kandidat_er_lovlig`
-- Bedre optimering: erstatt greedy i `generator.py` med f.eks. OR-Tools CP-SAT
+- CP-SAT som bakgrunnsjobb med fremdriftsindikator (i dag blokkerer
+  optimeringen HTTP-kallet i opptil 30 sekunder)
 - Vinterhalvåret: nattarbeidsreglene i aml §10-7 er strengere mellom 21:00 og 06:00

@@ -8,12 +8,10 @@ from pathlib import Path
 
 from .demo_data import MODALITETER, YRKESGRUPPER
 from .lager import skriv_atomisk
-from .modeller import Ansatt, DAG, DAG12, KVELD, NATT, NATT12, SkiftDef
+from .modeller import Ansatt
 from .regler import sett_helg_offsatter
 
 FIL = Path(__file__).resolve().parent.parent / "ansatte.json"
-
-SKIFT_DEFS: dict[str, SkiftDef] = {d.navn: d for d in (DAG, KVELD, NATT, DAG12, NATT12)}
 
 
 class AnsattFeil(ValueError):
@@ -39,10 +37,6 @@ def _utvid_datoer(tekst: str) -> tuple[list[date], str | None]:
     return [fra + timedelta(days=i) for i in range((til - fra).days + 1)], None
 
 
-def _skift_def(navn) -> SkiftDef | None:
-    return SKIFT_DEFS.get(str(navn).strip().upper())
-
-
 def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, list[str]]:
     advarsler: list[str] = []
     navn = str(rad.get("navn", "")).strip()
@@ -65,8 +59,8 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
     except (TypeError, ValueError):
         prosent = 100.0
     prosent = max(10.0, min(100.0, prosent))
-    foretrekker = {d for d in (_skift_def(s) for s in rad.get("foretrekker") or []) if d}
-    unnga = {d for d in (_skift_def(s) for s in rad.get("unnga") or []) if d}
+    foretrekker = {str(s).strip().upper() for s in (rad.get("foretrekker") or []) if str(s).strip()}
+    unnga = {str(s).strip().upper() for s in (rad.get("unnga") or []) if str(s).strip()}
     raa_langvakt = rad.get("langvakt_uke_maks")
     if raa_langvakt is None or str(raa_langvakt).strip() == "":
         langvakt_maks = None
@@ -126,8 +120,8 @@ def til_rad(a: Ansatt) -> dict:
         "yrkesgruppe": gruppe,
         "modaliteter": sorted(a.kompetanse & set(MODALITETER)),
         "stillingsprosent": a.stillingsprosent,
-        "foretrekker": sorted(d.navn for d in a.foretrekker),
-        "unnga": sorted(d.navn for d in a.unnga),
+        "foretrekker": sorted(a.foretrekker),
+        "unnga": sorted(a.unnga),
         "utilgjengelige_dager": sorted(d.isoformat() for d in a.utilgjengelige_dager),
         "langvakt_uke_maks": a.langvakt_uke_maks,
         "helg_hver_n": a.helg_hver_n,

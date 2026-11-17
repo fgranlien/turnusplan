@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from .modeller import Ansatt, KVELD, Krav, NATT, SkiftDef
+from .modeller import Ansatt, Krav, SkiftDef
 
 MODALITETER = ["Røntgen", "CT", "MR", "Ultralyd", "Mammografi", "Intervensjon"]
 YRKESGRUPPER = ("radiograf", "fagradiograf")
@@ -97,11 +97,11 @@ def bygg_ansatte(behov: dict[str, dict[str, list[Krav]]], skift_defs: list[Skift
         for _ in range(antall):
             ansatt = Ansatt(f"a{id_teller}", unikt_navn("radiograf"), {"radiograf", modality})
             if id_teller % 4 == 0:
-                ansatt.unnga = {NATT}
+                ansatt.unnga = {"NATT"}
             elif id_teller % 4 == 2:
-                ansatt.foretrekker = {NATT}
+                ansatt.foretrekker = {"NATT"}
             elif id_teller % 4 == 3:
-                ansatt.foretrekker = {KVELD}
+                ansatt.foretrekker = {"KVELD"}
             ansatte.append(ansatt)
             id_teller += 1
 
@@ -111,11 +111,11 @@ def bygg_ansatte(behov: dict[str, dict[str, list[Krav]]], skift_defs: list[Skift
             modalitet = aktive_modaliteter[i % len(aktive_modaliteter)] if aktive_modaliteter else "Røntgen"
             ansatt = Ansatt(f"a{id_teller}", unikt_navn("fagradiograf"), {"fagradiograf", modalitet})
             if id_teller % 4 == 0:
-                ansatt.unnga = {NATT}
+                ansatt.unnga = {"NATT"}
             elif id_teller % 4 == 2:
-                ansatt.foretrekker = {NATT}
+                ansatt.foretrekker = {"NATT"}
             elif id_teller % 4 == 3:
-                ansatt.foretrekker = {KVELD}
+                ansatt.foretrekker = {"KVELD"}
             ansatte.append(ansatt)
             id_teller += 1
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from . import regler
-from .modeller import Ansatt, Krav, NATT, Skift, SkiftDef, STANDARD_SKIFT
+from .modeller import Ansatt, Krav, Skift, SkiftDef, STANDARD_SKIFT
 
 ROTASJON_BONUS = {8: 0.5, 12: 0.3}
 BAKLENGS_STRAFF = {16: 1.0, 20: 1.0}
@@ -117,12 +117,12 @@ class TurnusGenerator:
         beste = max(kandidater, key=lambda a: (self._score(a, skift, krav), a.id))
         self._plan[beste.id].append(skift)
 
-    def _preferanser(self, ansatt: Ansatt, dato: date) -> tuple[set[SkiftDef], set[SkiftDef]]:
+    def _preferanser(self, ansatt: Ansatt, dato: date) -> tuple[set[str], set[str]]:
         if self.rotasjon is not None:
             syklus, grupper = self.rotasjon
             syklus_nr = (dato - self.start_dato).days // syklus
             idx = (self._grupper[ansatt.id] + syklus_nr) % grupper
-            return {self.skift_defs[idx]}, set()
+            return {self.skift_defs[idx].navn}, set()
         return ansatt.foretrekker, ansatt.unnga
 
     def _under_norm(self, ansatt: Ansatt, skift: Skift) -> bool:
@@ -158,8 +158,8 @@ class TurnusGenerator:
         return s
 
     @staticmethod
-    def _matcher(onsker: set[SkiftDef], skift: Skift) -> bool:
-        return skift.type in onsker or (NATT in onsker and skift.type.er_natt)
+    def _matcher(onsker: set[str], skift: Skift) -> bool:
+        return regler.matcher(onsker, skift.type)
 
     def _kapasitet(self, ansatt: Ansatt) -> int:
         uke_grense = self.uke_time_norm * ansatt.stillingsprosent / 100

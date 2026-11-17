@@ -431,6 +431,12 @@ function renderLaaste() {
 let ansatteListe = [];
 let ansatteKilde = 'demo';
 const PREF_ALTERNATIVER = [['DAG', 'Dag'], ['KVELD', 'Kveld'], ['NATT', 'Natt']];
+const PREF_ETIKETTER = {'DAG': 'Dag', 'KVELD': 'Kveld', 'NATT': 'Natt', 'MELLOM': 'Mellomvakt', 'DAG12': 'Dag 12 t', 'NATT12': 'Natt 12 t'};
+
+function prefAlternativer() {
+  const fraSkift = skiftListe.map(s => [s.navn, PREF_ETIKETTER[s.navn] || s.navn]);
+  return fraSkift.length ? fraSkift : PREF_ALTERNATIVER;
+}
 
 async function lastAnsatte() {
   try {
@@ -467,7 +473,7 @@ function renderAnsatte() {
       const valg = a[felt][0] || '';
       return `<select onchange="settPref(${i}, '${felt}', this.value)">` +
         '<option value="">–</option>' +
-        PREF_ALTERNATIVER.map(([v, t]) => `<option value="${v}" ${valg === v ? 'selected' : ''}>${t}</option>`).join('') +
+        prefAlternativer().map(([v, t]) => `<option value="${v}" ${valg === v ? 'selected' : ''}>${t}</option>`).join('') +
         '</select>';
     };
     html += `<tr>` +

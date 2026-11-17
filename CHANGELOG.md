@@ -3,6 +3,53 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 3.0 – Motor-omstrukturering: plassmodell, snittnorm og felles ukeshvile i CP-SAT
+
+Større omstrukturering av CP-SAT-motoren etter ekstern kodegjennomgang
+(«Forslag fra Claude»), pluss nye motor-tester.
+
+- **Plassmodell i CP-SAT**: hvert bemanningskrav er nå en egen plass
+  (`y[ansatt, dato, skift, plass]`) som må fylles av nøyaktig én kvalifisert
+  person. Tidligere kunne én person (f.eks. en fagradiograf med Røntgen som
+  hovedmodalitet) «telle» for to krav på samme skift i modellen. Dekning er
+  ikke lenger en hard betingelse som gjør modellen infeasible: plasser som
+  ikke kan fylles får en straffet slakkvariabel, så du får alltid en plan med
+  minst mulig udekket behov – og udekket-listen kommer direkte fra modellen
+- **Snittnorm i stedet for hard ukegrense**: tariffnormen (f.eks. 35,5 t ved
+  helkontinuerlig drift) håndheves nå som snitt over hele perioden
+  (`total_minutter <= norm × stillingsprosent × dager/7`), med straff for
+  avvik fra måltimer per ansatt. Ukegrensen per kalenderuke er lov-taket
+  (40 t × stillingsprosent). Tidligere gjorde 35,5-normen som hard ukegrense
+  at normen aldri kunne nås med 8-timersvakter
+- **Felles ukeshvile-definisjon**: CP-SAT bruker nå samme definisjon som
+  `regler.ukeshvile_ok` – minst 35 sammenhengende hviletimer modellert som
+  tre sammenhengende frie 12-timersblokker per kalenderuke. Tidligere var
+  CP-SAT-versjonen (to hele kalenderdøgn uten vaktstart) strengere enn
+  reglene og avviste lovlige mønstre som lørdag dag → mandag dag
+- **Låste vakter støttes i CP-SAT**: låste vakter legges inn som
+  `x[a, d, s] == 1` i modellen i stedet for å falle tilbake til greedy;
+  ulovlige eller umulige lås rapporteres i `laaste_feilet`
+- **Preferanser matches på skiftnavn**: `foretrekker`/`unnga` er nå mengder av
+  skiftnavn (store bokstaver) i stedet for `SkiftDef`-objekter. Ønsker om
+  mellomvakt og egendefinerte skift virker nå, og endring av klokkeslett på
+  et skift ødelegger ikke lenger lagrede ønsker. `regler.matcher(ønsker,
+  skift)` er ny felles hjelpefunksjon (navn-match, med NATT-fallback til alle
+  nattskift), brukt av begge motorer og GUI-et
+- **Plass-basert dekning i `valider_plan`**: valideringen teller nå
+  kvalifiserte tildelinger per krav-plass (samme person kan ikke fylle to
+  plasser på samme skift) – samme tolkning som greedy og CP-SAT
+- **CP-SAT-parametre**: `num_search_workers = os.cpu_count()`, `random_seed`
+  for reproduserbare planer, og `TIDSRENSNING` omdøpt til `TIDSBEGRENSNING`
+- **Nye motor-tester** (`tests/test_motorer.py`): 10 unittests som kjører
+  greedy og CP-SAT på samme input og krever at begge består samme
+  `valider_plan` – dekker 8-t og 12-t med snittnorm, fagradiograf-telling,
+  låste vakter (lovlig og ulovlig), 12-timers-tilvalg, helgrullering,
+  preferanser på navn inkl. mellomvakt og ansatte-lagring runt-trip
+- **Målfunksjonsretting**: belønningsledd (preferanser) og straffledd
+  (unngå, fagra-modalitet, avvik, slakk) blandet feil vei etter omskrivingen
+  – preferanser ble straffet i stedet for belønnet. Alle ledd er nå skalerte
+  heltall (vekter × 10) med vakt mot at små vekter trunkeres til 0
+
 ## 2.18 – Sikkerhet og feilretting (etter ekstern kodegjennomgang)
 
 - **GUI-serveren**: Host- og Origin-sjekk (kun localhost aksepteres), krav om
