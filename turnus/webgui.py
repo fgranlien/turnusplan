@@ -44,6 +44,20 @@ def _helg_arg(verdi) -> int | None:
         return None
 
 
+def _maks_natter_arg(verdi) -> int:
+    try:
+        return max(1, min(6, int(verdi or 3)))
+    except (TypeError, ValueError):
+        return 3
+
+
+def _maks_kvelder_arg(verdi) -> int:
+    try:
+        return max(1, min(6, int(verdi or 2)))
+    except (TypeError, ValueError):
+        return 2
+
+
 def generer_json(
     start: date,
     antall_dager: int,
@@ -56,6 +70,8 @@ def generer_json(
     motor: str = "greedy",
     laaste: list[dict] | None = None,
     helg_hver_n: int | None = None,
+    maks_natter: int = 3,
+    maks_kvelder: int = 2,
 ) -> dict:
     defs = skift_defs if skift_defs is not None else skift_lager.skift_defs_for(langvakter)
     bemanning_cfg = standard_bemanning(defs)
@@ -85,11 +101,13 @@ def generer_json(
     motor_status = ""
     motor_tid = None
     motor_merknad = ""
+    maks_natter_arg = max(1, min(6, int(maks_natter or 3)))
+    maks_kvelder_arg = max(1, min(6, int(maks_kvelder or 2)))
     if motor == "cpsat" and not rotasjon_arg:
         if not cpsat_tilgjengelig():
             motor_merknad = "ortools er ikke installert (pip3 install ortools) \u2013 bruker greedy."
         else:
-            los = loes_med_cpsat(ansatte, behov, start, antall_dager, defs, uke_time_norm, laaste=laaste_par)
+            los = loes_med_cpsat(ansatte, behov, start, antall_dager, defs, uke_time_norm, laaste=laaste_par, maks_natter=maks_natter_arg, maks_kvelder=maks_kvelder_arg)
             if los is not None:
                 motor_brukt = "cpsat"
                 motor_status = los.status
@@ -102,7 +120,8 @@ def generer_json(
         motor_merknad = "Rotasjonsrullering st\u00f8ttes forel\u00f8pig bare av greedy-motoren."
     if motor_brukt == "greedy":
         plan = TurnusGenerator(
-            ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg, laaste_par
+            ansatte, behov, start, antall_dager, defs, True, uke_time_norm, rotasjon_arg, laaste_par,
+            maks_natter_arg, maks_kvelder_arg,
         ).generer()
     global _siste_plan
     _siste_plan = {
@@ -117,12 +136,14 @@ def generer_json(
         "uke_time_norm": uke_time_norm,
         "rotasjon_arg": rotasjon_arg,
         "ansatte_kilde": ansatte_kilde,
+        "maks_natter": maks_natter_arg,
+        "maks_kvelder": maks_kvelder_arg,
     }
     motor_info = {"navn": motor_brukt, "status": motor_status, "tid": motor_tid, "merknad": motor_merknad}
     return _resultat_fra_plan(
         plan, ansatte, behov, bemanning_cfg, start, antall_dager, defs,
         uke_time_norm, rotasjon_arg, ansatte_kilde, motor_info=motor_info,
-        laaste_avvist=laaste_avvist,
+        laaste_avvist=laaste_avvist, maks_natter=maks_natter_arg, maks_kvelder=maks_kvelder_arg,
     )
 
 
@@ -190,6 +211,8 @@ def _resultat_fra_plan(
     udekket=None,
     motor_info=None,
     laaste_avvist=None,
+    maks_natter=3,
+    maks_kvelder=2,
 ):
     if udekket is None:
         udekket = plan.udekket
@@ -308,7 +331,7 @@ def _resultat_fra_plan(
             elif regler.matcher(a.unnga, s.type):
                 pref_totalt += 1
 
-    feil = regler.valider_plan(plan.tildelinger, ansatte, behov, start, antall_dager, defs, True)
+    feil = regler.valider_plan(plan.tildelinger, ansatte, behov, start, antall_dager, defs, True, maks_natter, maks_kvelder)
     kriterier = regler.turnus_kriterier(plan.tildelinger, ansatte, start, antall_dager, defs)
     tariff_brudd = regler.tariff_sjekk(plan.tildelinger, ansatte, start, antall_dager, uke_time_norm)
 
@@ -421,11 +444,11 @@ def vaktbytte_json(navn_a: str, navn_b: str, dato_iso: str, skift_navn: str) -> 
 
     feil_for = regler.valider_plan(
         ctx["tildelinger"], ctx["ansatte"], ctx["behov"], ctx["start"],
-        ctx["antall_dager"], ctx["defs"], True,
+        ctx["antall_dager"], ctx["defs"], True, ctx.get("maks_natter", 3), ctx.get("maks_kvelder", 2),
     )
     feil_etter = regler.valider_plan(
         nye_tildelinger, ctx["ansatte"], ctx["behov"], ctx["start"],
-        ctx["antall_dager"], ctx["defs"], True,
+        ctx["antall_dager"], ctx["defs"], True, ctx.get("maks_natter", 3), ctx.get("maks_kvelder", 2),
     )
     nye_brudd = [f for f in feil_etter if f not in feil_for]
     if nye_brudd:
@@ -437,6 +460,7 @@ def vaktbytte_json(navn_a: str, navn_b: str, dato_iso: str, skift_navn: str) -> 
         plan, ctx["ansatte"], ctx["behov"], ctx["bemanning"], ctx["start"],
         ctx["antall_dager"], ctx["defs"], ctx["uke_time_norm"],
         ctx["rotasjon_arg"], ctx["ansatte_kilde"], ctx["udekket"],
+        maks_natter=ctx.get("maks_natter", 3), maks_kvelder=ctx.get("maks_kvelder", 2),
     )
     if skift_b is not None:
         melding = f"{navn_a} og {navn_b} byttet vakter {dato_iso}: {skift_navn} mot {skift_b.type.navn}"
@@ -566,6 +590,8 @@ class Handler(BaseHTTPRequestHandler):
                     str(data.get("motor", "greedy")),
                     data.get("laaste"),
                     _helg_arg(data.get("helg_hver_n")),
+                    _maks_natter_arg(data.get("maks_natter")),
+                    _maks_kvelder_arg(data.get("maks_kvelder")),
                 )
             elif sti == "/api/skift":
                 data = json.loads(kropp)

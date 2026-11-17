@@ -3,6 +3,18 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.25 – Maks kvelder og netter på rad blir valgbart
+
+- **Nytt valg «Maks kvelder på rad» i Generer-fanen:** tre og fire kveldsvakter
+  på rad unngås (standard 2; 3 og 4 også valgbare). En kveld er et skift som
+  slutter kl. 20.00 eller senere uten å være natt – mellomvakt (slutt 19.00)
+  teller ikke. Håndheves hardt i greedy, CP-SAT, vaktbytte og validering
+- **«Maks netter på rad» justert:** standard er nå 3 (unngår fire netter på
+  rad); 2 og 4 (aml-tak) er fortsatt valgbare
+- Valgene lagres i GUI-innstillingene; nye CLI-flagg `--maks-kvelder` og
+  oppdatert `--maks-natter`
+- 4 nye tester (34 totalt)
+
 ## 2.24 – Samlete helger og global helgefrekvens
 
 - **Helger jobbes samlet:** begge motorer foretrekker nå at lørdag og

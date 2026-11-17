@@ -180,6 +180,20 @@ button, input, select, textarea, .tabbar button, .card, .dropzone { transition: 
           <option value="33.6">33,6 t – helkontinuerlig/sammenlignbart skiftarbeid</option>
         </select>
       </label>
+      <label>Maks kvelder på rad
+        <select id="maks-kvelder" title="Hvor mange kveldsvakter i strekk som tillates. 2 = unngår tre og fire kvelder på rad.">
+          <option value="2" selected>2 (unngår 3+ på rad)</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <label>Maks netter på rad
+        <select id="maks-natter" title="Hvor mange nattarbeid i strekk som tillates (aml-tak er 4 med avtale). 3 = unngår fire netter på rad.">
+          <option value="2">2</option>
+          <option value="3" selected>3 (unngår 4+ på rad)</option>
+          <option value="4">4 (aml-tak)</option>
+        </select>
+      </label>
       <label>Helgefrekvens (alle uten eget ønske)
         <select id="helg-frekvens" title="Gjelder alle ansatte som ikke har egen «Helg hver N.»-verdi. Ansatte med egen verdi beholder den.">
           <option value="">Ingen begrensning</option>
@@ -837,6 +851,8 @@ async function generer() {
                             syklus_uker: +document.getElementById('syklus').value || 4,
                             motor: document.getElementById('motor').value,
                             helg_hver_n: document.getElementById('helg-frekvens').value === '' ? null : +document.getElementById('helg-frekvens').value,
+                            maks_natter: +document.getElementById('maks-natter').value,
+                            maks_kvelder: +document.getElementById('maks-kvelder').value,
                             laaste: laasteVakter})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
@@ -1093,6 +1109,8 @@ function lagreInnstillinger() {
       rotasjon: document.getElementById('rotasjon').checked,
       syklus: document.getElementById('syklus').value,
       helg_frekvens: document.getElementById('helg-frekvens').value,
+      maks_natter: document.getElementById('maks-natter').value,
+      maks_kvelder: document.getElementById('maks-kvelder').value,
     }));
   } catch (e) {}
 }
@@ -1107,6 +1125,8 @@ function hentInnstillinger() {
     if (s.rotasjon !== undefined) document.getElementById('rotasjon').checked = s.rotasjon;
     if (s.syklus) document.getElementById('syklus').value = s.syklus;
     if (s.helg_frekvens !== undefined) document.getElementById('helg-frekvens').value = s.helg_frekvens;
+    if (s.maks_natter) document.getElementById('maks-natter').value = s.maks_natter;
+    if (s.maks_kvelder) document.getElementById('maks-kvelder').value = s.maks_kvelder;
   } catch (e) {}
 }
 
@@ -1128,7 +1148,7 @@ function visVaktbytte(d) {
     <label>Skift <select id="bytt-skift">${skift}</select></label>
     <button class="liten" onclick="gjennomforBytte()">Foreslå og sjekk bytte</button>
   </div><div id="bytt-status"></div>
-  <p class="laster">Har mottakeren en vakt samme dag byttes de to vaktene; ellers overtar mottakeren vakten. Byttet gjennomføres bare hvis døgnhvile, ukeshvile, uketimer, natteserier, kompetanse, fravær og dekning fortsatt er i orden.</p></div>`;
+  <p class="laster">Har mottakeren en vakt samme dag byttes de to vaktene; ellers overtar mottakeren vakten. Byttet gjennomføres bare hvis døgnhvile, ukeshvile, uketimer, kveld- og natteserier, kompetanse, fravær og dekning fortsatt er i orden.</p></div>`;
 }
 
 async function gjennomforBytte() {
@@ -1155,7 +1175,7 @@ async function gjennomforBytte() {
 }
 
 function valideringHtml(feil, kontekst) {
-  if (!feil.length) return `<div class="status ok">✓ Ingen brudd funnet (${esc(kontekst)}): døgnhvile 11 t, ukeshvile 35 t, uketimer 40 t, skiftlengde og natteserier er innenfor grensene.</div>`;
+  if (!feil.length) return `<div class="status ok">✓ Ingen brudd funnet (${esc(kontekst)}): døgnhvile 11 t, ukeshvile 35 t, uketimer 40 t, skiftlengde og kveld-/natteserier er innenfor grensene.</div>`;
   let html = `<div class="status brudd">✗ ${feil.length} mulig(e) lovbrudd (${esc(kontekst)}):<ul>`;
   for (const f of feil) html += `<li>${esc(f)}</li>`;
   return html + '</ul></div>';

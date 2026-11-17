@@ -50,6 +50,8 @@ def loes_med_cpsat(
     uke_time_norm: float = 40.0,
     tidsbegrensning: float = TIDSBEGRENSNING,
     laaste: list[tuple[str, Skift]] | None = None,
+    maks_natter: int = 4,
+    maks_kvelder: int = 2,
 ) -> Losning | None:
     try:
         from ortools.sat.python import cp_model
@@ -194,17 +196,18 @@ def loes_med_cpsat(
             model.Add(sum(zs) >= 1)
 
     for a in ansatte:
-        for i in range(antall_dager - regler.MAKS_NATTER_ONK):
-            vindu = []
-            for j in range(i, i + regler.MAKS_NATTER_ONK + 1):
-                d = datoer[j]
-                vindu.extend(
-                    x[a.id, d, sd.navn]
-                    for (dd, sd) in combos
-                    if dd == d and sd.er_natt and (a.id, d, sd.navn) in x
-                )
-            if vindu:
-                model.Add(sum(vindu) <= regler.MAKS_NATTER_ONK)
+        for grense, er_type in ((maks_natter, lambda sd: sd.er_natt), (maks_kvelder, regler.er_kveld)):
+            for i in range(antall_dager - grense):
+                vindu = []
+                for j in range(i, i + grense + 1):
+                    d = datoer[j]
+                    vindu.extend(
+                        x[a.id, d, sd.navn]
+                        for (dd, sd) in combos
+                        if dd == d and er_type(sd) and (a.id, d, sd.navn) in x
+                    )
+                if vindu:
+                    model.Add(sum(vindu) <= grense)
 
     total_behov_minutter = sum(
         int(defs_med_navn[sd_navn].varighet.total_seconds() // 60) * len(krav_plasser)

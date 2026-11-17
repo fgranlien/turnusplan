@@ -54,7 +54,7 @@ def valider_ics_fil(sti: str, stillingsprosent: float) -> None:
         print(f"\n  Totalt {len(feil)} mulig(e) lovbrudd – verifiser mot gjeldende avtaler.")
     else:
         print("  ✓ Ingen brudd funnet: døgnhvile (11 t), ukeshvile (35 t), uketimer (40 t),")
-        print("    skiftlengde og natteserier er innenfor grensene.")
+        print("    skiftlengde og kveld-/natteserier er innenfor grensene.")
 
 
 def main() -> None:
@@ -66,6 +66,8 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765, help="Port for GUI-et (standard 8765)")
     parser.add_argument("--valider-fil", metavar="FIL.ICS", help="Valider en eksisterende turnus i iCal-format i stedet for å generere")
     parser.add_argument("--stillingsprosent", type=float, default=100.0, help="Stillingsprosent for validering (standard 100)")
+    parser.add_argument("--maks-natter", type=int, default=3, choices=[1, 2, 3, 4], help="Maks nattarbeid i strekk (standard 3, unngår fire på rad; aml-tak 4)")
+    parser.add_argument("--maks-kvelder", type=int, default=2, choices=[1, 2, 3, 4], help="Maks kveldsvakter i strekk (standard 2, unngår tre og fire på rad)")
     args = parser.parse_args()
 
     if args.gui:
@@ -87,7 +89,7 @@ def main() -> None:
     behov = bygg_behov(bemanning, skift_defs)
     ansatte = bygg_ansatte(behov, skift_defs)
 
-    plan = TurnusGenerator(ansatte, behov, start, antall_dager, skift_defs, langvakt_avtale).generer()
+    plan = TurnusGenerator(ansatte, behov, start, antall_dager, skift_defs, langvakt_avtale, maks_natter=args.maks_natter, maks_kvelder=args.maks_kvelder).generer()
     ansatt_med_id = {a.id: a for a in ansatte}
 
     slutt = start + timedelta(days=antall_dager - 1)
@@ -150,7 +152,7 @@ def main() -> None:
         for skift, krav in plan.udekket:
             print(f"  {skift.etikett} {skift.dato:%d.%m}: mangler {krav.antall} '{krav.kompetanse}'")
 
-    feil = regler.valider_plan(plan.tildelinger, ansatte, behov, start, antall_dager, skift_defs, langvakt_avtale)
+    feil = regler.valider_plan(plan.tildelinger, ansatte, behov, start, antall_dager, skift_defs, langvakt_avtale, args.maks_natter, args.maks_kvelder)
     print("\n" + "=" * 78)
     print("VALIDERING MOT ARBEIDSMILJØLOVEN KAP. 10")
     print("=" * 78)
@@ -159,7 +161,8 @@ def main() -> None:
             print(f"  ✗ {feil_melding}")
     else:
         print("  ✓ Ingen brudd: døgnhvile (11 t), ukeshvile (35 t), uketimer (40 t),")
-        print("    skiftlengde, natteserier (maks 4) og dekning av kompetansebehov er oppfylt.")
+        print(f"    skiftlengde, kveldeserier (maks {args.maks_kvelder}), natteserier (maks {args.maks_natter})")
+        print("    og dekning av kompetansebehov er oppfylt.")
 
 
 if __name__ == "__main__":

@@ -38,6 +38,8 @@ class TurnusGenerator:
         uke_time_norm: float = 40.0,
         rotasjon: tuple[int, int] | None = None,
         laaste: list[tuple[str, Skift]] | None = None,
+        maks_natter: int = 4,
+        maks_kvelder: int = 2,
     ):
         self.ansatte = ansatte
         self.behov = behov
@@ -47,6 +49,8 @@ class TurnusGenerator:
         self.langvakt_avtale = langvakt_avtale
         self.uke_time_norm = uke_time_norm
         self.rotasjon = rotasjon
+        self.maks_natter = max(1, int(maks_natter))
+        self.maks_kvelder = max(1, int(maks_kvelder))
         if rotasjon is not None:
             syklus, grupper = rotasjon
             self._grupper = {
@@ -93,10 +97,10 @@ class TurnusGenerator:
                 f"L\u00e5st vakt avvist: {ansatt.navn} er utilgjengelig {skift.dato:%d.%m}"
             )
             return
-        if not regler.kandidat_er_lovlig(ansatt, self._plan[ansatt.id], skift, self.langvakt_avtale):
+        if not regler.kandidat_er_lovlig(ansatt, self._plan[ansatt.id], skift, self.langvakt_avtale, self.maks_natter, self.maks_kvelder):
             self._laaste_feilet.append(
                 f"L\u00e5st vakt avvist: {ansatt.navn} kan ikke ha {skift.type.navn} {skift.dato:%d.%m} "
-                "innenfor aml-reglene (d\u00f8gnhvile, uketimer, ukeshvile eller natteserie)"
+                "innenfor aml-reglene (d\u00f8gnhvile, uketimer, ukeshvile, kveld- eller natteserie)"
             )
             return
         self._plan[ansatt.id].append(skift)
@@ -106,7 +110,7 @@ class TurnusGenerator:
             a
             for a in self.ansatte
             if krav.kompetanse in a.kompetanse
-            and regler.kandidat_er_lovlig(a, self._plan[a.id], skift, self.langvakt_avtale)
+            and regler.kandidat_er_lovlig(a, self._plan[a.id], skift, self.langvakt_avtale, self.maks_natter, self.maks_kvelder)
         ]
         if not kandidater:
             self._udekket.append((skift, krav))

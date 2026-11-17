@@ -392,3 +392,97 @@ class HelgTest(unittest.TestCase):
                     self.assertTrue(regler.helgfrekvens_ok(a, s.dato), f"{a.navn} jobbet helg {s.dato}")
         jobbet_helg = {a.id for a in ansatte if any(s.dato.weekday() >= 5 for s in plan.tildelinger[a.id])}
         self.assertTrue(jobbet_helg)
+
+class NatterTest(unittest.TestCase):
+    def natt_scenario(self):
+        ansatte = ansatte_12t(9)
+        bemanning = {
+            "DAG12": {"R\u00f8ntgen": {"hverdag": 1, "helg": 0}},
+            "NATT12": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}},
+        }
+        return ansatte, bygg_behov(bemanning, [DAG12, NATT12]), [DAG12, NATT12]
+
+    @staticmethod
+    def lengste_natteserie(tildelinger, ansatte):
+        lengst = 0
+        for a in ansatte:
+            natt_dager = sorted(s.dato for s in tildelinger[a.id] if s.type.er_natt)
+            lengde = 0
+            forrige = None
+            for d in natt_dager:
+                lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
+                lengst = max(lengst, lengde)
+                forrige = d
+        return lengst
+
+    def test_maks_2_natter_greedy(self):
+        ansatte, behov, defs = self.natt_scenario()
+        plan = TurnusGenerator(ansatte, behov, START, 28, defs, maks_natter=2).generer()
+        self.assertEqual(plan.udekket, [])
+        self.assertLessEqual(self.lengste_natteserie(plan.tildelinger, ansatte), 2)
+
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
+    def test_maks_2_natter_cpsat(self):
+        ansatte, behov, defs = self.natt_scenario()
+        los = cpsat_generator.loes_med_cpsat(ansatte, behov, START, 28, defs, tidsbegrensning=25.0, maks_natter=2)
+        self.assertIsNotNone(los)
+        self.assertLessEqual(self.lengste_natteserie(los.tildelinger, ansatte), 2)
+
+    def test_valider_plan_maks_natter(self):
+        a = radiograf("Nattfan", {"R\u00f8ntgen"})
+        plan = {a.id: [Skift(START + timedelta(days=d), NATT12) for d in range(3)]}
+        feil2 = regler.valider_plan(plan, [a], {}, START, 3, [DAG12, NATT12], True, maks_natter=2)
+        feil4 = regler.valider_plan(plan, [a], {}, START, 3, [DAG12, NATT12], True, maks_natter=4)
+        self.assertTrue(any("Natteserie" in f for f in feil2), feil2)
+        self.assertFalse(any("Natteserie" in f for f in feil4), feil4)
+
+
+class KvelderTest(unittest.TestCase):
+    def kveld_scenario(self):
+        ansatte = ansatte_12t(9)
+        bemanning = {
+            "DAG": {"R\u00f8ntgen": {"hverdag": 1, "helg": 0}},
+            "KVELD": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}},
+        }
+        return ansatte, bygg_behov(bemanning, [DAG, KVELD]), [DAG, KVELD]
+
+    @staticmethod
+    def lengste_kveldeserie(tildelinger, ansatte):
+        lengst = 0
+        for a in ansatte:
+            kveld_dager = sorted(s.dato for s in tildelinger[a.id] if regler.er_kveld(s.type))
+            lengde = 0
+            forrige = None
+            for d in kveld_dager:
+                lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
+                lengst = max(lengst, lengde)
+                forrige = d
+        return lengst
+
+    def test_maks_2_kvelder_greedy(self):
+        ansatte, behov, defs = self.kveld_scenario()
+        plan = TurnusGenerator(ansatte, behov, START, 28, defs, maks_kvelder=2).generer()
+        self.assertEqual(plan.udekket, [])
+        self.assertLessEqual(self.lengste_kveldeserie(plan.tildelinger, ansatte), 2)
+
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
+    def test_maks_2_kvelder_cpsat(self):
+        ansatte, behov, defs = self.kveld_scenario()
+        los = cpsat_generator.loes_med_cpsat(ansatte, behov, START, 28, defs, tidsbegrensning=25.0, maks_kvelder=2)
+        self.assertIsNotNone(los)
+        self.assertLessEqual(self.lengste_kveldeserie(los.tildelinger, ansatte), 2)
+
+    def test_valider_plan_maks_kvelder(self):
+        a = radiograf("Kveldfan", {"R\u00f8ntgen"})
+        plan = {a.id: [Skift(START + timedelta(days=d), KVELD) for d in range(3)]}
+        feil2 = regler.valider_plan(plan, [a], {}, START, 3, [DAG, KVELD], True, maks_kvelder=2)
+        feil4 = regler.valider_plan(plan, [a], {}, START, 3, [DAG, KVELD], True, maks_kvelder=4)
+        self.assertTrue(any("Kveldeserie" in f for f in feil2), feil2)
+        self.assertFalse(any("Kveldeserie" in f for f in feil4), feil4)
+
+    def test_kandidat_3_kvelder_avvises(self):
+        a = radiograf("Kveldfan", {"R\u00f8ntgen"})
+        eksisterende = [Skift(START + timedelta(days=d), KVELD) for d in range(2)]
+        tredje = Skift(START + timedelta(days=2), KVELD)
+        self.assertFalse(regler.kandidat_er_lovlig(a, eksisterende, tredje, True, 4, 2))
+        self.assertTrue(regler.kandidat_er_lovlig(a, eksisterende, tredje, True, 4, 3))

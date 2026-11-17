@@ -149,6 +149,7 @@ Alternativt direkte: `python3 main.py --langvakter`. Alt kjører på standardbib
 | Maks 9 t per døgn normalt, 10 t utvidet | aml §10-3 | `regler.valider_plan` |
 | Vakter over 10 t krever avtale/tariff, maks 12 t | aml §10-3/10-6 | `langvakt_avtale`-flagg i `regler.kandidat_er_lovlig` |
 | Maks 4 nattarbeid i strekk, begrenset nattarbeid | aml §10-7 | `regler.natteserie_lengde` |
+| Maks kveldsvakter på rad (valgbar, standard 2) og maks netter på rad (valgbar, standard 3) | internt krav | `regler.kveldeserie_lengde` / `regler.natteserie_lengde` |
 | Kompetansebehov dekkes på alle skift | internt krav | `regler.valider_plan` |
 
 ## Langvakter (12 t)

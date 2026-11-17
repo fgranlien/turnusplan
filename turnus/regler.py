@@ -11,6 +11,7 @@ MAKS_TIMER_PER_DOGN_UTVIDET = 10.0
 MAKS_SKIFTLENGDE_MED_AVTALE = 12.0
 MAKS_UKETIMER_NORMAL = 40.0
 MAKS_NATTER_ONK = 4
+MAKS_KVELDER_ONK = 2
 UKELANGD = timedelta(days=7)
 
 TARIFF_NORMER = {
@@ -183,6 +184,10 @@ def langvakt_uke_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) 
     return antall <= ansatt.langvakt_uke_maks
 
 
+def er_kveld(skift_def: SkiftDef) -> bool:
+    return not skift_def.er_natt and skift_def.slutt_time >= 20
+
+
 def natteserie_lengde(skift_liste: list[Skift], dato: date) -> int:
     natt_dager = {s.dato for s in skift_liste if s.type.er_natt}
     lengde = 0
@@ -193,11 +198,23 @@ def natteserie_lengde(skift_liste: list[Skift], dato: date) -> int:
     return lengde
 
 
+def kveldeserie_lengde(skift_liste: list[Skift], dato: date) -> int:
+    kveld_dager = {s.dato for s in skift_liste if er_kveld(s.type)}
+    lengde = 0
+    d = dato - timedelta(days=1)
+    while d in kveld_dager:
+        lengde += 1
+        d -= timedelta(days=1)
+    return lengde
+
+
 def kandidat_er_lovlig(
     ansatt: Ansatt,
     eksisterende: list[Skift],
     kandidat: Skift,
     langvakt_avtale: bool = True,
+    maks_natter: int = MAKS_NATTER_ONK,
+    maks_kvelder: int = MAKS_KVELDER_ONK,
 ) -> bool:
     if kandidat.dato in ansatt.utilgjengelige_dager:
         return False
@@ -213,7 +230,9 @@ def kandidat_er_lovlig(
         return False
     if not langvakt_uke_ok(ansatt, eksisterende, kandidat):
         return False
-    if kandidat.type.er_natt and natteserie_lengde(eksisterende, kandidat.dato) >= MAKS_NATTER_ONK:
+    if kandidat.type.er_natt and natteserie_lengde(eksisterende, kandidat.dato) >= maks_natter:
+        return False
+    if er_kveld(kandidat.type) and kveldeserie_lengde(eksisterende, kandidat.dato) >= maks_kvelder:
         return False
     uke_start = kandidat.dato - timedelta(days=kandidat.dato.weekday())
     plan_uke = eksisterende + [kandidat]
@@ -228,6 +247,8 @@ def valider_vakter(
     stillingsprosent: float = 100.0,
     navn: str = "Ansatt",
     langvakt_avtale: bool = True,
+    maks_natter: int = MAKS_NATTER_ONK,
+    maks_kvelder: int = MAKS_KVELDER_ONK,
 ) -> list[str]:
     feil: list[str] = []
     sortert = sorted(vakter, key=lambda v: v.start)
@@ -276,8 +297,18 @@ def valider_vakter(
     forrige = None
     for d in natt_dager:
         lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
-        if lengde > MAKS_NATTER_ONK:
-            feil.append(f"Natteserie: {navn} har {lengde} nattarbeid i strekk (maks {MAKS_NATTER_ONK})")
+        if lengde > maks_natter:
+            feil.append(f"Natteserie: {navn} har {lengde} nattarbeid i strekk (maks {maks_natter})")
+        forrige = d
+
+    kveld = lambda v: v.slutt.date() == v.start.date() and v.slutt.hour >= 20
+    kveld_dager = sorted({v.start.date() for v in sortert if kveld(v)})
+    lengde = 0
+    forrige = None
+    for d in kveld_dager:
+        lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
+        if lengde > maks_kvelder:
+            feil.append(f"Kveldeserie: {navn} har {lengde} kveldsvakter i strekk (maks {maks_kvelder})")
         forrige = d
 
     dogn_grense = MAKS_SKIFTLENGDE_MED_AVTALE if langvakt_avtale else MAKS_TIMER_PER_DOGN
@@ -318,6 +349,8 @@ def valider_plan(
     antall_dager: int,
     skift_defs: list[SkiftDef],
     langvakt_avtale: bool = True,
+    maks_natter: int = MAKS_NATTER_ONK,
+    maks_kvelder: int = MAKS_KVELDER_ONK,
 ) -> list[str]:
     feil: list[str] = []
     ansatt_med_id = {a.id: a for a in ansatte}
@@ -410,8 +443,17 @@ def valider_plan(
         forrige = None
         for d in natt_dager:
             lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
-            if lengde > MAKS_NATTER_ONK:
-                feil.append(f"Natteserie: {ansatt.navn} har {lengde} nattarbeid i strekk (maks {MAKS_NATTER_ONK})")
+            if lengde > maks_natter:
+                feil.append(f"Natteserie: {ansatt.navn} har {lengde} nattarbeid i strekk (maks {maks_natter})")
+            forrige = d
+
+        kveld_dager = sorted(s.dato for s in sortert if er_kveld(s.type))
+        lengde = 0
+        forrige = None
+        for d in kveld_dager:
+            lengde = lengde + 1 if forrige is not None and (d - forrige).days == 1 else 1
+            if lengde > maks_kvelder:
+                feil.append(f"Kveldeserie: {ansatt.navn} har {lengde} kveldsvakter i strekk (maks {maks_kvelder})")
             forrige = d
 
         dogn_grense = MAKS_SKIFTLENGDE_MED_AVTALE if langvakt_avtale else MAKS_TIMER_PER_DOGN
