@@ -3,6 +3,31 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.23 – GUI-modernisering: flyt, valg og visuell oppfriskning
+
+- **Stegnumreert flyt i Generer-fanen:** 1 Periode og motor, 2 Skift og
+  mellomvakter, 3 Bemanning per skift, 4 Låste vakter (valgfritt) –
+  sekundære seksjoner (Forvalg, Låste vakter) er nå sammenleggbare så
+  hovedflyten står fremtredende
+- **Segmented controls** i stedet for spredte småknapper: rullende lengde
+  (4/6/8/12 uker) og motor (Rask/Nøyaktig) viser nå tydelig hva som er valgt;
+  motorvalget lagres fortsatt i innstillinger
+- **Sticky fanemeny** som følger med ved rulling, tydelig aktiv fane og
+  hover-tilstander
+- **Tom-tilstand i Turnus-fanen** med forklaring og snarvei til Generer når
+  ingen turnus er generert ennå
+- **Dra og slipp** av .ics-fil i Valider-fanen (beholdt klikk-til-valg), med
+  valgt filnavn vist
+- **AI-ønskeboksen** i Ansatte-fanen er egen ramse; Cmd/Ctrl+Enter starter
+  tolking; knappehierarki (Lagre ansatte = primær)
+- Moderne visuell stil: kort med myke skygger, statusbokser med farget
+  kantlinje, fokusmarkering (tilgjengelighet), overganger med
+  prefers-reduced-motion-støtte, forbedret mørk modus
+- **Flytfeil rettet:** valideringsresultatet havnet i Turnus-fanen uten at
+  fanen ble vist – nå byttes fanen automatisk for både validering og feil
+- Utskrifts-PDF-en er uendret (A4 landskap, kun turnusen); ingen endringer i
+  backend eller motorer; 23/23 tester fortsatt grønne
+
 ## 2.22 – Ønsketolking med lokal LLM (Ollama)
 
 - Nytt valgfritt felt i Ansatte-fanen: skriv ønsker i fritekst

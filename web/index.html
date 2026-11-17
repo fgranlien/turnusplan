@@ -5,22 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Turnusplan</title>
 <style>
-:root { --bg:#f5f6f8; --card:#fff; --tekst:#1c2733; --grå:#66707a; --linje:#e3e7ec; --blå:#0b62d6; --grønn:#0e8a4d; --rød:#c0392b; }
+:root { --bg:#f6f7f9; --card:#fff; --tekst:#16212b; --grå:#5f6b76; --linje:#e4e8ed; --blå:#0b62d6; --grønn:#0e8a4d; --rød:#c0392b; --skygge:0 1px 2px rgba(16,24,40,.05),0 2px 8px rgba(16,24,40,.05); }
 * { box-sizing: border-box; }
-body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--tekst); }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--tekst); line-height:1.45; }
 header { padding:24px 32px 8px; }
-h1 { margin:0; font-size:26px; }
+h1 { margin:0; font-size:26px; letter-spacing:-.01em; }
 header p { margin:4px 0 0; color:var(--grå); }
 main { max-width:1000px; margin:0 auto; padding:16px 32px 48px; }
-.card { background:var(--card); border:1px solid var(--linje); border-radius:12px; padding:20px 24px; margin-top:16px; }
-.card h2 { margin:0 0 12px; font-size:17px; }
+.card { background:var(--card); border:1px solid transparent; border-radius:14px; padding:20px 24px; margin-top:16px; box-shadow:var(--skygge); }
+.card h2 { margin:0 0 12px; font-size:17px; display:flex; align-items:center; gap:10px; }
+.steg { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--blå); color:#fff; font-size:13px; font-weight:600; flex:none; }
 .rad { display:flex; flex-wrap:wrap; gap:16px; align-items:end; }
 label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--grå); }
 label.sjekk { flex-direction:row; align-items:center; gap:8px; padding-bottom:10px; }
 input[type=date], input[type=number], input[type=text], select, textarea { padding:8px 10px; border:1px solid var(--linje); border-radius:8px; font-size:14px; background:#fff; color:var(--tekst); font-family:inherit; }
 textarea { resize:vertical; }
-button { background:var(--blå); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; }
+:focus-visible { outline:2px solid var(--blå); outline-offset:2px; }
+button { background:var(--blå); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; font-weight:500; }
+button:hover:not(:disabled) { background:var(--blå-mork, #084fae); }
 button:disabled { opacity:.5; cursor:default; }
+:root { --blå-mork:#084fae; }
 table { border-collapse:collapse; width:100%; font-size:13.5px; margin-top:8px; }
 th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--linje); }
 th { color:var(--grå); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
@@ -28,19 +32,25 @@ td.skift-navn { font-weight:600; white-space:nowrap; }
 .pill { display:inline-block; border-radius:20px; padding:2px 10px; margin:2px 4px 2px 0; font-size:12.5px; background:#eef3fb; color:var(--blå); }
 .pill.fagradiograf { background:#f3ecfd; color:#6b34c1; }
 .pill.radiograf { background:#e7f6ee; color:var(--grønn); }
-.status { margin-top:14px; padding:12px 16px; border-radius:8px; font-size:14px; }
-.status.ok { background:#e7f6ee; color:var(--grønn); }
-.status.brudd { background:#fdecea; color:var(--rød); }
+.status { margin-top:14px; padding:12px 16px; border-radius:8px; font-size:14px; border-left:4px solid transparent; }
+.status.ok { background:#e7f6ee; color:var(--grønn); border-left-color:var(--grønn); }
+.status.brudd { background:#fdecea; color:var(--rød); border-left-color:var(--rød); }
 .status.brudd li { margin:4px 0; }
 .laster { color:var(--grå); font-size:13px; }
 h3 { font-size:15px; margin:20px 0 4px; }
 p { font-size:14px; }
-.tabbar { display:flex; gap:4px; max-width:1000px; margin:8px auto 0; padding:0 32px; }
-.tabbar button { background:#e6e9ee; color:var(--tekst); border-radius:10px 10px 0 0; padding:10px 20px; font-size:14px; }
-.tabbar button.aktiv { background:var(--card); font-weight:600; }
-.skjult { display:none; }
-button.liten { padding:6px 12px; font-size:12.5px; background:#e6e9ee; color:var(--tekst); }
+.tabbar { display:flex; gap:6px; position:sticky; top:0; z-index:5; background:var(--bg); max-width:1000px; margin:8px auto 0; padding:12px 32px 10px; border-bottom:1px solid var(--linje); }
+.tabbar button { background:transparent; color:var(--grå); border-radius:8px; padding:9px 18px; font-size:14px; }
+.tabbar button:hover { background:#e9edf2; color:var(--tekst); }
+.tabbar button.aktiv { background:var(--blå); color:#fff; font-weight:600; }
+.skjult { display:none !important; }
+button.liten { padding:6px 12px; font-size:12.5px; background:#e9edf2; color:var(--tekst); }
+button.liten:hover:not(:disabled) { background:#dde3ea; }
 button.liten.aktiv { background:var(--blå); color:#fff; }
+.segment { display:inline-flex; background:#e9edf2; border-radius:9px; padding:3px; gap:2px; }
+.segment button { background:transparent; color:var(--tekst); padding:6px 14px; font-size:13px; border-radius:7px; }
+.segment button:hover:not(:disabled) { background:rgba(16,24,40,.06); }
+.segment button.aktiv { background:var(--card); color:var(--tekst); font-weight:600; box-shadow:0 1px 2px rgba(16,24,40,.12); }
 .rull { overflow-x:auto; }
 .mod-grid { display: grid; grid-template-columns: auto auto; gap: 2px 12px; }
 #ansatte-tabell th, #ansatte-tabell td { padding: 6px 7px; vertical-align: top; }
@@ -48,16 +58,29 @@ button.liten.aktiv { background:var(--blå); color:#fff; }
 .tips { margin-top: 14px; }
 .tips summary { cursor: pointer; color: var(--grå); font-size: 13px; }
 .tips p { margin: 8px 0 0; }
+details.avansert > summary { cursor:pointer; color:var(--grå); font-size:15px; font-weight:600; user-select:none; }
+details.avansert > summary:hover { color:var(--tekst); }
+.ai-boks { border:1px solid var(--linje); border-radius:10px; padding:14px 16px; margin-top:16px; background:#fafbfd; }
+.ai-boks h3 { margin-top:0; }
+.tom { text-align:center; padding:56px 24px; color:var(--grå); }
+.tom .stor { font-size:40px; margin-bottom:8px; }
+.dropzone { border:2px dashed var(--linje); border-radius:10px; padding:22px; text-align:center; color:var(--grå); cursor:pointer; font-size:14px; }
+.dropzone.over { border-color:var(--blå); background:#f0f6ff; }
 table.matrix { font-size:11px; }
 table.matrix th, table.matrix td { padding:3px 4px; text-align:center; border-bottom:1px solid var(--linje); border-right:1px solid var(--linje); }
 table.matrix th { font-size:10px; }
 table.matrix td.navn, table.matrix th.navn { text-align:left; white-space:nowrap; padding-left:8px; }
 table.matrix td.navn { position:sticky; left:0; background:var(--card); z-index:1; }
-body.mork { --bg:#14181d; --card:#1d232a; --tekst:#e4e9ee; --grå:#98a4b0; --linje:#2c343d; }
-body.mork .tabbar button { background:#242c35; color:var(--tekst); }
-body.mork .tabbar button.aktiv { background:var(--card); }
-body.mork input, body.mork select { background:#242c35; color:var(--tekst); border-color:var(--linje); }
+body.mork { --bg:#14181d; --card:#1d232a; --tekst:#e4e9ee; --grå:#98a4b0; --linje:#2c343d; --skygge:0 1px 2px rgba(0,0,0,.3); }
+body.mork .tabbar button { background:transparent; color:var(--grå); }
+body.mork .tabbar button:hover { background:#242c35; color:var(--tekst); }
+body.mork .tabbar button.aktiv { background:var(--blå); color:#fff; }
+body.mork input, body.mork select, body.mork textarea { background:#242c35; color:var(--tekst); border-color:var(--linje); }
 body.mork button.liten { background:#242c35; color:var(--tekst); }
+body.mork .segment { background:#242c35; }
+body.mork .segment button.aktiv { background:#313b46; }
+body.mork .ai-boks { background:#20262e; }
+body.mork .dropzone.over { background:#1c2a3a; }
 body.mork .pill { background:#24303f; }
 body.mork .pill.fagradiograf { background:#33274a; }
 body.mork .pill.radiograf { background:#1e3229; }
@@ -89,19 +112,21 @@ body.mork .badge { background:#24303f; }
 table.matrix tr:hover td { box-shadow: inset 0 0 0 9999px rgba(11,98,214,.06); }
 .under { color:#b26a00; font-size:11px; white-space:nowrap; margin-left:4px; }
 .modal-bakgrunn { position:fixed; inset:0; background:rgba(20,26,33,.55); display:flex; align-items:center; justify-content:center; z-index:10; }
-.modal { background:var(--card); color:var(--tekst); border-radius:12px; padding:20px 24px; max-width:560px; width:92%; max-height:80vh; overflow:auto; }
+.modal { background:var(--card); color:var(--tekst); border-radius:12px; padding:20px 24px; max-width:560px; width:92%; max-height:80vh; overflow:auto; box-shadow:0 8px 30px rgba(16,24,40,.25); }
 .modal h3 { margin-top:0; }
-.modal .lukk { float:right; background:#e6e9ee; color:var(--tekst); padding:4px 10px; font-size:12.5px; }
+.modal .lukk { float:right; background:#e9edf2; color:var(--tekst); padding:4px 10px; font-size:12.5px; }
 button.spinner::after { content:''; display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; margin-left:8px; vertical-align:-2px; animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
+button, input, select, textarea, .tabbar button, .card, .dropzone { transition: background-color .15s, border-color .15s, box-shadow .15s, color .15s; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   body, body.mork { --bg:#fff; --card:#fff; --tekst:#000; --grå:#555; --linje:#bbb; }
   body { background:#fff; color:#000; }
   header, .tabbar, button, .vaktbytte-boks, .minuke-velg { display: none !important; }
   main { max-width: none; padding: 0; }
-  .card { border: 0; border-radius: 0; padding: 0; margin: 0 0 14px; background: #fff; }
-  #tab-generer, #tab-ansatte, #tab-valider { display: none !important; }
+  .card { border: 0; border-radius: 0; padding: 0; margin: 0 0 14px; background: #fff; box-shadow: none; }
+  #tab-generer, #tab-ansatte, #tab-valider, #turnus-tom { display: none !important; }
   #tab-turnus { display: block !important; }
   .rull { overflow: visible; }
   table.matrix { font-size: 9px; }
@@ -132,21 +157,21 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
   </div>
   <div id="tab-generer">
   <section class="card">
-    <h2>Generer turnusforslag</h2>
+    <h2><span class="steg">1</span> Periode og motor</h2>
     <div class="rad">
       <label>Startdato <input type="date" id="start" value="2025-03-03"></label>
       <label>Antall dager <input type="number" id="dager" value="28" min="7" max="84" step="7"></label>
+      <label>Rullende lengde
+        <span class="segment" id="uke-segment">
+          <button type="button" class="liten" onclick="settUker(4)">4 uker</button>
+          <button type="button" class="liten" onclick="settUker(6)">6 uker</button>
+          <button type="button" class="liten" onclick="settUker(8)">8 uker</button>
+          <button type="button" class="liten" onclick="settUker(12)">12 uker</button>
+        </span>
+      </label>
       <button id="generer-knapp" onclick="generer()">Generer forslag</button>
     </div>
     <div class="rad" style="margin-top:10px">
-      <label>Rullende lengde:
-        <span>
-          <button class="liten" onclick="settUker(4)">4 uker</button>
-          <button class="liten" onclick="settUker(6)">6 uker</button>
-          <button class="liten" onclick="settUker(8)">8 uker</button>
-          <button class="liten" onclick="settUker(12)">12 uker</button>
-        </span>
-      </label>
       <label>Arbeidsuke-norm (tariff)
         <select id="norm">
           <option value="40">40 t – kun lovens maks (aml §10-2)</option>
@@ -156,10 +181,11 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
         </select>
       </label>
       <label>Motor
-        <select id="motor">
-          <option value="greedy">Rask (greedy)</option>
-          <option value="cpsat">Nøyaktig (CP-SAT)</option>
-        </select>
+        <span class="segment" id="motor-segment">
+          <button type="button" class="aktiv" data-motor="greedy" onclick="settMotor('greedy')" title="Rask heuristikk, alltid på under et sekund">Rask (greedy)</button>
+          <button type="button" data-motor="cpsat" onclick="settMotor('cpsat')" title="Optimaliserer med begrensninger, kan ta opptil 30 sekunder">Nøyaktig (CP-SAT)</button>
+        </span>
+        <input type="hidden" id="motor" value="greedy">
       </label>
     </div>
     <div class="rad" style="margin-top:10px">
@@ -169,30 +195,32 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
     </div>
   </section>
   <section class="card">
-    <h2>Forvalg (lagret oppsett)</h2>
-    <div class="rad">
-      <label>Lagret oppsett
-        <select id="forvalg-valg"></select>
-      </label>
-      <button class="liten" onclick="lastForvalg()">Last</button>
-      <button class="liten" onclick="slettForvalg()">Slett</button>
-      <label>Navn <input type="text" id="forvalg-navn" placeholder="f.eks. Vinter 2026" style="width:160px"></label>
-      <button class="liten" onclick="lagreForvalg()">Lagre nåværende oppsett</button>
-    </div>
-    <div id="forvalg-status"></div>
-    <p class="laster">Lagrer skift, bemanning, arbeidsuke-norm og ansattliste samlet. «Last» overskriver gjeldende oppsett (og skift.json/ansatte.json) med det lagrede.</p>
+    <details class="avansert">
+      <summary>Forvalg (lagret oppsett)</summary>
+      <div class="rad" style="margin-top:12px">
+        <label>Lagret oppsett
+          <select id="forvalg-valg"></select>
+        </label>
+        <button class="liten" onclick="lastForvalg()">Last</button>
+        <button class="liten" onclick="slettForvalg()">Slett</button>
+        <label>Navn <input type="text" id="forvalg-navn" placeholder="f.eks. Vinter 2026" style="width:160px"></label>
+        <button class="liten" onclick="lagreForvalg()">Lagre nåværende oppsett</button>
+      </div>
+      <div id="forvalg-status"></div>
+      <p class="laster">Lagrer skift, bemanning, arbeidsuke-norm og ansattliste samlet. «Last» overskriver gjeldende oppsett (og skift.json/ansatte.json) med det lagrede.</p>
+    </details>
   </section>
   <section class="card">
-    <h2>Skift og mellomvakter</h2>
+    <h2><span class="steg">2</span> Skift og mellomvakter</h2>
     <div class="rad">
       <label>Forhåndsvalg:
-        <span>
-          <button class="liten" onclick="settSkiftPreset('standard')">8 t: DAG/KVELD/NATT</button>
-          <button class="liten" onclick="settSkiftPreset('mellomvakt')">8 t + mellomvakt</button>
-          <button class="liten" onclick="settSkiftPreset('langvakter')">12 t: DAG12/NATT12</button>
+        <span class="segment">
+          <button type="button" class="liten" onclick="settSkiftPreset('standard')">8 t: DAG/KVELD/NATT</button>
+          <button type="button" class="liten" onclick="settSkiftPreset('mellomvakt')">8 t + mellomvakt</button>
+          <button type="button" class="liten" onclick="settSkiftPreset('langvakter')">12 t: DAG12/NATT12</button>
         </span>
       </label>
-      <button onclick="leggTilSkift()">+ Legg til skift</button>
+      <button class="liten" onclick="leggTilSkift()">+ Legg til skift</button>
       <button id="lagre-skift-knapp" onclick="lagreSkift()">Lagre skift</button>
     </div>
     <div id="skift-tabell"></div>
@@ -200,24 +228,32 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
     <p class="laster">Slutt før start betyr nattskift over midnatt. Mellomvakt 11:30–19:00 på hverdager er standard – endre tidene (f.eks. til 15:00–23:00) for å gjøre den om til kveldsvakt.</p>
   </section>
   <section class="card">
-    <h2>Bemanning per skift</h2>
+    <h2><span class="steg">3</span> Bemanning per skift</h2>
     <div id="bemanning"></div>
     <p class="laster">Velg hvilke modaliteter avdelingen dekker. I hver celle: øverste felt = hverdag (man–fre), nederste = helg (lør–søn). Antall ansatte beregnes automatisk.</p>
   </section>
   <section class="card">
-    <h2>Låste vakter</h2>
-    <div class="rad">
-      <label>Ansatt <select id="laas-navn"></select></label>
-      <label>Dato <input type="date" id="laas-dato"></label>
-      <label>Skift <select id="laas-skift"></select></label>
-      <button class="liten" onclick="laasVakt()">Lås vakt</button>
-      <button class="liten" onclick="nullstillLaaste()">Nullstill</button>
-    </div>
-    <div id="laaste-liste"></div>
-    <p class="laster">Låste vakter fordeles først av generatoren. Vakter som bryter aml-reglene eller kompetansekravene avvises med begrunnelse i resultatet.</p>
+    <details class="avansert">
+      <summary><span class="steg">4</span> Låste vakter (valgfritt)</summary>
+      <div class="rad" style="margin-top:12px">
+        <label>Ansatt <select id="laas-navn"></select></label>
+        <label>Dato <input type="date" id="laas-dato"></label>
+        <label>Skift <select id="laas-skift"></select></label>
+        <button class="liten" onclick="laasVakt()">Lås vakt</button>
+        <button class="liten" onclick="nullstillLaaste()">Nullstill</button>
+      </div>
+      <div id="laaste-liste"></div>
+      <p class="laster">Låste vakter fordeles først av generatoren. Vakter som bryter aml-reglene eller kompetansekravene avvises med begrunnelse i resultatet.</p>
+    </details>
   </section>
   </div>
   <div id="tab-turnus" class="skjult">
+  <div id="turnus-tom" class="tom">
+    <div class="stor">🗓️</div>
+    <p><b>Ingen turnus generert ennå.</b></p>
+    <p class="laster">Sett opp periode, skift og bemanning, og klikk «Generer forslag».</p>
+    <button onclick="visTab('generer')">Gå til Generer</button>
+  </div>
   <div id="resultat"></div>
   </div>
   <div id="tab-ansatte" class="skjult">
@@ -225,17 +261,20 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
     <h2>Ansatte</h2>
     <p class="laster" id="ansatte-kilde"></p>
     <div id="ansatte-tabell"></div>
-    <div class="rad" style="margin-top:16px;align-items:flex-end">
-      <label style="flex:1;min-width:280px">Ønsker med fritekst (valgfri AI-hjelp via Ollama, kjøres lokalt)
-        <textarea id="ai-fritekst" rows="2" style="width:100%" placeholder="f.eks. «ikke natt, helst 12-timersvakter annenhver helg, fravær 1. til 14. juli 2025»"></textarea>
-      </label>
-      <label>Gjelder <select id="ai-ansatt"></select></label>
-      <label>Modell <select id="ai-modell"></select></label>
-      <button id="ai-knapp" onclick="tolkOnsker()">Tolk ønsker</button>
+    <div class="ai-boks">
+      <h3>Ønsker med fritekst <span class="laster">· valgfri AI-hjelp, kjøres lokalt via Ollama</span></h3>
+      <div class="rad" style="align-items:flex-end">
+        <label style="flex:1;min-width:280px">Ønsker
+          <textarea id="ai-fritekst" rows="2" style="width:100%" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')tolkOnsker()" placeholder="f.eks. «ikke natt, helst 12-timersvakter annenhver helg, fravær 1. til 14. juli 2025»"></textarea>
+        </label>
+        <label>Gjelder <select id="ai-ansatt"></select></label>
+        <label>Modell <select id="ai-modell"></select></label>
+        <button id="ai-knapp" onclick="tolkOnsker()">Tolk ønsker</button>
+      </div>
+      <div id="ai-status"></div>
     </div>
-    <div id="ai-status"></div>
     <div class="rad" style="margin-top:14px">
-      <button onclick="leggTilAnsatt()">+ Legg til ansatt</button>
+      <button class="liten" onclick="leggTilAnsatt()">+ Legg til ansatt</button>
       <button id="lagre-ansatte-knapp" onclick="lagreAnsatte()">Lagre ansatte</button>
     </div>
     <div id="ansatte-status"></div>
@@ -249,7 +288,12 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
   <section class="card">
     <h2>Valider eksisterende turnus (iCal fra Minarbeidsplan)</h2>
     <div class="rad">
-      <label>iCal-fil <input type="file" id="icsfil" accept=".ics,text/calendar"></label>
+      <label style="flex:1;min-width:260px">iCal-fil
+        <div class="dropzone" id="ics-drop" onclick="document.getElementById('icsfil').click()">
+          Dra .ics-filen hit, eller klikk for å velge <b id="ics-filnavn"></b>
+          <input type="file" id="icsfil" accept=".ics,text/calendar" style="display:none">
+        </div>
+      </label>
       <label>Stillingsprosent <input type="number" id="prosent" value="100" min="10" max="100"></label>
       <button id="valider-knapp" onclick="valider()">Valider mot aml</button>
     </div>
@@ -410,7 +454,17 @@ function visTab(navn) {
 
 function settUker(uker) {
   document.getElementById('dager').value = uker * 7;
-  document.querySelectorAll('button.liten').forEach(b => b.classList.toggle('aktiv', b.textContent === uker + ' uker'));
+  document.querySelectorAll('#uke-segment button').forEach(b => b.classList.toggle('aktiv', b.textContent === uker + ' uker'));
+}
+
+function settMotor(v) {
+  document.getElementById('motor').value = v;
+  document.querySelectorAll('#motor-segment button').forEach(b => b.classList.toggle('aktiv', b.dataset.motor === v));
+}
+
+function skjulTomTurnus() {
+  const el = document.getElementById('turnus-tom');
+  if (el) el.classList.add('skjult');
 }
 
 renderBemanning();
@@ -778,7 +832,9 @@ async function generer() {
     visGenerert(data);
     visTab('turnus');
   } catch (e) {
+    skjulTomTurnus();
     document.getElementById('resultat').innerHTML = `<div class="status brudd">Feil: ${esc(e.message)}</div>`;
+    visTab('turnus');
   }
   knapp.disabled = false; knapp.classList.remove('spinner'); knapp.textContent = 'Generer forslag';
 }
@@ -887,6 +943,7 @@ function byttMork() {
 })();
 
 function visGenerert(d) {
+  skjulTomTurnus();
   forrigeResultat = sisteResultat;
   sisteResultat = d;
   let html = `<section class="card"><h2>Turnusforslag – ${esc(d.modus)} (${esc(d.periode.start)} – ${esc(d.periode.slutt)})</h2>`;
@@ -1034,7 +1091,7 @@ function hentInnstillinger() {
     if (s.start) document.getElementById('start').value = s.start;
     if (s.dager) document.getElementById('dager').value = s.dager;
     if (s.norm) document.getElementById('norm').value = s.norm;
-    if (s.motor) document.getElementById('motor').value = s.motor;
+    if (s.motor) settMotor(s.motor);
     if (s.rotasjon !== undefined) document.getElementById('rotasjon').checked = s.rotasjon;
     if (s.syklus) document.getElementById('syklus').value = s.syklus;
   } catch (e) {}
@@ -1106,8 +1163,11 @@ async function valider() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
     visValidering(data, fil.name);
+    visTab('turnus');
   } catch (e) {
+    skjulTomTurnus();
     document.getElementById('resultat').innerHTML = `<div class="status brudd">Feil: ${esc(e.message)}</div>`;
+    visTab('turnus');
   }
   knapp.disabled = false; knapp.textContent = 'Valider mot aml';
 }
@@ -1126,8 +1186,25 @@ function visValidering(d, filnavn) {
   }
   for (const m of d.merknader || []) html += `<p class="laster">• ${esc(m)}</p>`;
   html += valideringHtml(d.feil || [], `stillingsprosent ${document.getElementById('prosent').value || 100} %`);
+  skjulTomTurnus();
   document.getElementById('resultat').innerHTML = html + '</section>';
 }
+
+(function initIcsDrop() {
+  const drop = document.getElementById('ics-drop');
+  const filInput = document.getElementById('icsfil');
+  if (!drop || !filInput) return;
+  const visNavn = () => {
+    const f = filInput.files[0];
+    document.getElementById('ics-filnavn').textContent = f ? f.name : '';
+  };
+  ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => {
+    if (e.dataTransfer && e.dataTransfer.files.length) { filInput.files = e.dataTransfer.files; visNavn(); }
+  });
+  filInput.addEventListener('change', visNavn);
+})();
 </script>
 </body>
 </html>
