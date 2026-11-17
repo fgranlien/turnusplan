@@ -43,6 +43,9 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
   raske greedy-motoren: modellerer hele horisonten samtidig og finner bevist
   optimal turnus innen alle aml- og tariffregler. Installer valgfritt med
   `pip3 install ortools` – uten den brukes greedy automatisk
+- **Helgrullering per ansatt** – kolonnen «Helg hver N.» i Ansatte-fanen:
+  3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helg; ansatte med samme
+  frekvens staggres automatisk så helgene fordeles jevnt
 - **12-timers-tilvalg per ansatt** – kolonnen «12-t vakter/uke» i Ansatte-fanen
   setter hvor mange 12-timersvakter den ansatte ønsker per uke (tom = ingen
   grense, 0 = nei); håndheves av generatoren og ved vaktbytte

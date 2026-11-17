@@ -57,6 +57,7 @@ def generer_json(
     else:
         ansatte = bygg_ansatte(behov, defs)
         ansatte_kilde = "demo"
+    regler.sett_helg_offsatter(ansatte)
     rotasjon_arg = (syklus_uker * 7, len(defs)) if rotasjon and syklus_uker > 0 else None
     laaste_par, laaste_avvist = _laaste_par(laaste, ansatte, defs, start, antall_dager)
     motor_brukt = "greedy"

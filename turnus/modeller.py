@@ -59,6 +59,8 @@ class Ansatt:
     unnga: set[SkiftDef] = field(default_factory=set)
     utilgjengelige_dager: set[date] = field(default_factory=set)
     langvakt_uke_maks: int | None = None
+    helg_hver_n: int | None = None
+    helg_offset: int = 0
 
 
 @dataclass(frozen=True)

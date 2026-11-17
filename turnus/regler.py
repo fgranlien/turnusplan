@@ -123,6 +123,31 @@ def uketimer_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) -> b
     return timer <= grense + 1e-9
 
 
+_EPOCH_LORDAG = date(2020, 1, 4)
+
+
+def sett_helg_offsatter(ansatte: list[Ansatt]) -> None:
+    teller: dict[int, int] = {}
+    for ansatt in sorted(ansatte, key=lambda a: a.id):
+        n = ansatt.helg_hver_n
+        if n is None or n <= 0:
+            ansatt.helg_offset = 0
+            continue
+        ansatt.helg_offset = teller.get(n, 0) % n
+        teller[n] = teller.get(n, 0) + 1
+
+
+def helgfrekvens_ok(ansatt: Ansatt, dato: date) -> bool:
+    if ansatt.helg_hver_n is None:
+        return True
+    if dato.weekday() < 5:
+        return True
+    if ansatt.helg_hver_n == 0:
+        return False
+    helg_nr = (dato - _EPOCH_LORDAG).days // 7
+    return (helg_nr + ansatt.helg_offset) % ansatt.helg_hver_n == 0
+
+
 def langvakt_uke_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) -> bool:
     if ansatt.langvakt_uke_maks is None:
         return True
@@ -154,6 +179,8 @@ def kandidat_er_lovlig(
     langvakt_avtale: bool = True,
 ) -> bool:
     if kandidat.dato in ansatt.utilgjengelige_dager:
+        return False
+    if not helgfrekvens_ok(ansatt, kandidat.dato):
         return False
     if not langvakt_avtale and _timer(kandidat) > MAKS_TIMER_PER_DOGN_UTVIDET:
         return False
@@ -297,6 +324,15 @@ def valider_plan(
             timer = sum(_timer(s) for s in sortert if _midnatt(ws) <= s.start < _midnatt(ws) + UKELANGD)
             if timer > grense + 1e-9:
                 feil.append(f"Uketimer: {ansatt.navn} har {timer:.1f} t i uke {ws.isocalendar()[1]} (grense {grense:.0f} t)")
+
+        if ansatt.helg_hver_n is not None:
+            rullering = "aldri helg" if ansatt.helg_hver_n == 0 else f"hver {ansatt.helg_hver_n}. helg"
+            for s in sortert:
+                if not helgfrekvens_ok(ansatt, s.dato):
+                    feil.append(
+                        f"Helgfrekvens: {ansatt.navn} har vakt i en helg utenfor sin rullering "
+                        f"({rullering}) {s.dato:%d.%m}"
+                    )
 
         if ansatt.langvakt_uke_maks is not None:
             for u in range(antall_dager // 7 + 2):

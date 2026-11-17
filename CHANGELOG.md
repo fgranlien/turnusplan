@@ -3,6 +3,18 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.17 – Helgrullering per ansatt
+
+- Ny kolonne «Helg hver N.» i Ansatte-fanen: tom = ingen begrensning,
+  3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helgvakt
+- Ansatte med samme frekvens får automatisk forskjellige picker, slik at
+  helgvaktene fordeles jevnt (ikke alle samme helg)
+- Håndheves av begge motorene: greedy (lovighetssjekk) og CP-SAT (fjerner
+  helgvakter utenfor rulleringen fra modellen)
+- Vaktbytte avvises hvis mottakeren får helgvakt utenfor sin rullering
+- Merk: hvis tilvalgene gjør helgedekningen umulig, vises udekket behov med
+  løsningsforslag (CP-SAT faller da tilbake til greedy med merknad)
+
 ## 2.16 – Tilvalg for 12-timersvakter per ansatt
 
 - Ny kolonne «12-t vakter/uke» i Ansatte-fanen: hvor mange 12-timersvakter

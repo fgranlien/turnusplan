@@ -54,6 +54,8 @@ def loes_med_cpsat(
         for d, sd in combos:
             if d in a.utilgjengelige_dager:
                 continue
+            if not regler.helgfrekvens_ok(a, d):
+                continue
             x[a.id, d, sd.navn] = model.NewBoolVar(f"x_{a.id}_{d.isoformat()}_{sd.navn}")
 
     def vars_for(a: Ansatt, d: date) -> list:

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .demo_data import MODALITETER, YRKESGRUPPER
 from .modeller import Ansatt, DAG, DAG12, KVELD, NATT, NATT12, SkiftDef
+from .regler import sett_helg_offsatter
 
 FIL = Path(__file__).resolve().parent.parent / "ansatte.json"
 
@@ -75,6 +76,17 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
             advarsler.append(
                 f"{navn}: ugjenkjennelig antall 12-timersvakter '{raa_langvakt}' (ignorerer tilvalget)"
             )
+    raa_helg = rad.get("helg_hver_n")
+    if raa_helg is None or str(raa_helg).strip() == "":
+        helg_n = None
+    else:
+        try:
+            helg_n = max(0, min(12, int(raa_helg)))
+        except (TypeError, ValueError):
+            helg_n = None
+            advarsler.append(
+                f"{navn}: ugjenkjennelig helgfrekvens '{raa_helg}' (ignorerer tilvalget)"
+            )
     utilgjengelige: set[date] = set()
     for s in rad.get("utilgjengelige_dager") or []:
         datoer, feil = _utvid_datoer(str(s))
@@ -99,6 +111,7 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
         unnga,
         utilgjengelige,
         langvakt_maks,
+        helg_n,
     )
     return ansatt, advarsler
 
@@ -115,6 +128,7 @@ def til_rad(a: Ansatt) -> dict:
         "unnga": sorted(d.navn for d in a.unnga),
         "utilgjengelige_dager": sorted(d.isoformat() for d in a.utilgjengelige_dager),
         "langvakt_uke_maks": a.langvakt_uke_maks,
+        "helg_hver_n": a.helg_hver_n,
     }
 
 
@@ -146,6 +160,7 @@ def lagre(data: list) -> tuple[int, list[str]]:
         ansatt, adv = til_ansatt(rad, i, brukte)
         ansatte.append(ansatt)
         advarsler.extend(adv)
+    sett_helg_offsatter(ansatte)
     rader = [til_rad(a) for a in ansatte]
     FIL.write_text(
         json.dumps(rader, ensure_ascii=False, indent=2) + "\n",
