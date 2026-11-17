@@ -91,6 +91,7 @@ def loes_med_cpsat(
 
     y: dict[tuple[str, date, str, int], object] = {}
     slakk: dict[tuple[date, str, int], tuple[object, Krav]] = {}
+    fagra_straff: list = []
     for (d, sd_navn), krav_plasser in plasser.items():
         for p, krav in enumerate(krav_plasser):
             kvalifiserte = [
@@ -104,6 +105,8 @@ def loes_med_cpsat(
                 v = model.NewBoolVar(f"y_{a.id}_{d.isoformat()}_{sd_navn}_{p}")
                 y[a.id, d, sd_navn, p] = v
                 y_vars.append(v)
+                if "fagradiograf" in a.kompetanse and krav.kompetanse != "fagradiograf":
+                    fagra_straff.append(int(FAGRA_MODALITET_STRAFF * 10) * v)
             if y_vars:
                 model.Add(sum(y_vars) + s_var == 1)
             else:
@@ -126,12 +129,23 @@ def loes_med_cpsat(
     laaste_feilet: list[str] = []
     for ansatt_id, skift in (laaste or []):
         nokkel = (ansatt_id, skift.dato, skift.type.navn)
+        ansatt = next((a for a in ansatte if a.id == ansatt_id), None)
+        navn = ansatt.navn if ansatt else ansatt_id
+        krav_plasser = plasser.get((skift.dato, skift.type.navn), [])
         if nokkel not in x:
-            ansatt = next((a for a in ansatte if a.id == ansatt_id), None)
-            navn = ansatt.navn if ansatt else ansatt_id
             laaste_feilet.append(
                 f"L\u00e5st vakt avvist: {navn} kan ikke ha {skift.type.navn} {skift.dato:%d.%m} "
-                "(frav\u00e6r, helgrullering eller manglende kompetanse p\u00e5 skiftet)"
+                "(frav\u00e6r, helgrullering eller skift-tilgang)"
+            )
+            continue
+        if not krav_plasser:
+            laaste_feilet.append(
+                f"L\u00e5st vakt avvist: {skift.type.navn} {skift.dato:%d.%m} har ingen bemanningsbehov"
+            )
+            continue
+        if ansatt is None or not any(k.kompetanse in ansatt.kompetanse for k in krav_plasser):
+            laaste_feilet.append(
+                f"L\u00e5st vakt avvist: {navn} mangler kompetanse for {skift.type.navn} {skift.dato:%d.%m}"
             )
             continue
         model.Add(x[nokkel] == 1)
@@ -153,35 +167,30 @@ def loes_med_cpsat(
     uker_start = start - timedelta(days=start.weekday())
     antall_uker = (antall_dager + start.weekday() + 6) // 7
 
-    def blokk_overlapp(sd: SkiftDef, dd: date, b_start: datetime, b_slutt: datetime) -> bool:
-        s_start = datetime.combine(dd, time()) + timedelta(hours=sd.start_time)
-        s_slutt = datetime.combine(dd, time()) + timedelta(hours=sd.slutt_time)
-        return s_start < b_slutt and s_slutt > b_start
-
     for a in ansatte:
         for u in range(antall_uker):
             ws = uker_start + timedelta(days=7 * u)
-            blokker = []
-            for dagforskjell in range(-1, 8):
-                d = ws + timedelta(days=dagforskjell)
-                for halv in (0, 1):
-                    b_start = datetime.combine(d, time()) + timedelta(hours=12 * halv)
-                    b_slutt = b_start + timedelta(hours=12)
-                    b = model.NewBoolVar(f"blokk_{a.id}_{u}_{dagforskjell}_{halv}")
-                    for dd, sd in combos:
-                        if abs((dd - d).days) > 1:
-                            continue
-                        if (a.id, dd, sd.navn) in x and blokk_overlapp(sd, dd, b_start, b_slutt):
-                            model.Add(b <= 1 - x[a.id, dd, sd.navn])
-                    blokker.append(b)
-            triple_vars = []
-            for t in range(len(blokker) - 2):
-                tr = model.NewBoolVar(f"triple_{a.id}_{u}_{t}")
-                model.Add(tr <= blokker[t])
-                model.Add(tr <= blokker[t + 1])
-                model.Add(tr <= blokker[t + 2])
-                triple_vars.append(tr)
-            model.Add(sum(triple_vars) >= 1)
+            ws_dt = datetime.combine(ws, time())
+            uke_slutt_dt = ws_dt + timedelta(days=7)
+            hvile_lengde = regler.MIN_UKESHVILE
+            kandidater = [ws_dt]
+            for dd, sd in combos:
+                if (a.id, dd, sd.navn) in x:
+                    kandidater.append(datetime.combine(dd, time()) + timedelta(hours=sd.slutt_time))
+            zs = []
+            for t in kandidater:
+                if t >= uke_slutt_dt or t + hvile_lengde <= ws_dt:
+                    continue
+                z = model.NewBoolVar(f"hvile_{a.id}_{u}_{t.isoformat()}")
+                for dd, sd in combos:
+                    if (a.id, dd, sd.navn) not in x:
+                        continue
+                    s_start = datetime.combine(dd, time()) + timedelta(hours=sd.start_time)
+                    s_slutt = datetime.combine(dd, time()) + timedelta(hours=sd.slutt_time)
+                    if s_start < t + hvile_lengde and s_slutt > t:
+                        model.Add(z <= 1 - x[a.id, dd, sd.navn])
+                zs.append(z)
+            model.Add(sum(zs) >= 1)
 
     for a in ansatte:
         for i in range(antall_dager - regler.MAKS_NATTER_ONK):
@@ -195,6 +204,12 @@ def loes_med_cpsat(
                 )
             if vindu:
                 model.Add(sum(vindu) <= regler.MAKS_NATTER_ONK)
+
+    total_behov_minutter = sum(
+        int(defs_med_navn[sd_navn].varighet.total_seconds() // 60) * len(krav_plasser)
+        for (_d, sd_navn), krav_plasser in plasser.items()
+    )
+    sum_prosent = sum(a.stillingsprosent for a in ansatte) or 1.0
 
     obj: list = []
     for a in ansatte:
@@ -219,8 +234,14 @@ def loes_med_cpsat(
         mal = round(uke_time_norm * a.stillingsprosent / 100 * 60 * antall_dager / 7)
         if total_minutter:
             model.Add(sum(total_minutter) <= mal)
-            avvik = model.NewIntVar(0, mal, f"avvik_{a.id}")
-            model.Add(avvik >= mal - sum(total_minutter))
+        if total_behov_minutter > 0:
+            mal_andel = round(total_behov_minutter * a.stillingsprosent / sum_prosent)
+            avvik = model.NewIntVar(0, max(mal_andel, mal), f"avvik_{a.id}")
+            if total_minutter:
+                model.Add(avvik >= sum(total_minutter) - mal_andel)
+                model.Add(avvik >= mal_andel - sum(total_minutter))
+            else:
+                model.Add(avvik == mal_andel)
             obj.append(int(AVVIK_VEKT * 10) * avvik)
 
     for a in ansatte:
@@ -243,10 +264,6 @@ def loes_med_cpsat(
             if lange:
                 model.Add(sum(lange) <= a.langvakt_uke_maks)
 
-    def har_fagra_krav(d: date, sd: SkiftDef) -> bool:
-        krav_liste = behov.get(kategori[d], {}).get(sd.navn, [])
-        return any(k.kompetanse == "fagradiograf" for k in krav_liste)
-
     for a in ansatte:
         for d, sd in combos:
             v = x.get((a.id, d, sd.navn))
@@ -256,8 +273,6 @@ def loes_med_cpsat(
                 obj.append(-int(PREF_BONUS * 10) * v)
             if regler.matcher(a.unnga, sd):
                 obj.append(int(UNNGA_STRAFF * 10) * v)
-            if "fagradiograf" in a.kompetanse and not har_fagra_krav(d, sd):
-                obj.append(int(FAGRA_MODALITET_STRAFF * 10) * v)
 
     natt_vars_liste = []
     for a in ansatte:
@@ -273,6 +288,7 @@ def loes_med_cpsat(
     for n in natt_vars_liste:
         model.Add(n <= nmax)
     obj.append(int(NATT_BALANSE_VEKT * 10) * nmax)
+    obj.extend(fagra_straff)
     obj.extend(int(SLAKK_STRAFF * 10) * s for s, _ in slakk.values())
 
     model.Minimize(sum(obj))

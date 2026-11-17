@@ -284,6 +284,23 @@ def valider_vakter(
     return feil
 
 
+def maks_matching(plasser: list[str], personer: list[set[str]]) -> int:
+    """Maksimal bipartitt matching (Kuhn): hvor mange plasser som kan fylles samtidig."""
+    eier: dict[int, int] = {}
+
+    def prov(p: int, sett: set[int]) -> bool:
+        for i, kompetanse in enumerate(personer):
+            if i in sett or plasser[p] not in kompetanse:
+                continue
+            sett.add(i)
+            if i not in eier or prov(eier[i], sett):
+                eier[i] = p
+                return True
+        return False
+
+    return sum(1 for p in range(len(plasser)) if prov(p, set()))
+
+
 def valider_plan(
     tildelinger: dict[str, list[Skift]],
     ansatte: list[Ansatt],
@@ -305,23 +322,24 @@ def valider_plan(
             if not krav_liste:
                 continue
             tildelte = [a_id for a_id, skift_liste in tildelinger.items() if skift in skift_liste]
-            kvalifiserte_totalt: set[str] = set()
             for krav in krav_liste:
                 kvalifiserte = {
                     a_id for a_id in tildelte
                     if krav.kompetanse in ansatt_med_id[a_id].kompetanse
                 }
-                kvalifiserte_totalt |= kvalifiserte
                 if len(kvalifiserte) < krav.antall:
                     feil.append(
                         f"Dekning: {skift.etikett} {dato:%d.%m} mangler {krav.antall - len(kvalifiserte)} med kompetanse '{krav.kompetanse}'"
                     )
             totalt_behov = sum(k.antall for k in krav_liste)
-            if len(kvalifiserte_totalt) < totalt_behov:
+            plasser = [k.kompetanse for k in krav_liste for _ in range(k.antall)]
+            personer = [ansatt_med_id[a_id].kompetanse for a_id in tildelte]
+            matchet = maks_matching(plasser, personer)
+            if matchet < totalt_behov:
                 feil.append(
                     f"Dekning: {skift.etikett} {dato:%d.%m} krever {totalt_behov} personer, "
-                    f"men bare {len(kvalifiserte_totalt)} kvalifiserte er tildelt "
-                    "(\u00e9n person kan ikke fylle to krav på samme skift)"
+                    f"men de tildelte kan bare fylle {matchet} plasser samtidig "
+                    "(kompetansene overlapper – én person kan ikke fylle to krav på samme skift)"
                 )
 
     for a_id, skift_liste in tildelinger.items():

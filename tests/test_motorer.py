@@ -74,11 +74,13 @@ class MotorerTest(unittest.TestCase):
         self.assertEqual(feil_cpsat, [])
         return greedy, los
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_begge_motorer_gyldig_8t(self):
         greedy, los = self.sjekk_begge(standard_ansatte_8t(), behov_8t(), [DAG, KVELD, NATT], 14)
         self.assertEqual(greedy.udekket, [])
         self.assertEqual(los.udekket, [])
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_begge_motorer_gyldig_12t_snittnorm(self):
         ansatte = ansatte_12t()
         greedy, los = self.sjekk_begge(ansatte, behov_12t(), [DAG12, NATT12], 28, norm=35.5)
@@ -94,6 +96,7 @@ class MotorerTest(unittest.TestCase):
                 )
                 self.assertLessEqual(timer, 40.0 + 1e-9)
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_fagradiograf_teller_ikke_dobbelt(self):
         ansatte = [fagradiograf("Fagra", "R\u00f8ntgen"), radiograf("CT1", {"CT"})]
         bemanning = {
@@ -118,6 +121,7 @@ class MotorerTest(unittest.TestCase):
         feil = regler.valider_plan(los.tildelinger, ansatte, behov, START, 5, [DAG], True)
         self.assertTrue(any("R\u00f8ntgen" in f for f in feil))
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_laaste_vakter_cpsat(self):
         ansatte = standard_ansatte_8t()
         behov = behov_8t()
@@ -132,6 +136,7 @@ class MotorerTest(unittest.TestCase):
         self.assertEqual(los.laaste_feilet, [])
         self.assertIn(laast[1], los.tildelinger[ansatte[1].id])
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_laaste_ulovlig_vakt_avvises_cpsat(self):
         ansatte = standard_ansatte_8t()
         ansatte[1].utilgjengelige_dager = {START + timedelta(days=2)}
@@ -143,6 +148,7 @@ class MotorerTest(unittest.TestCase):
         self.assertIsNotNone(los)
         self.assertEqual(len(los.laaste_feilet), 1)
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_langvakt_tilvalg_cpsat(self):
         ansatte = ansatte_12t(6, langvakt_uke_maks=1)
         los = cpsat_generator.loes_med_cpsat(
@@ -158,6 +164,7 @@ class MotorerTest(unittest.TestCase):
                 )
                 self.assertLessEqual(lange, 1)
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_helg_hver_n_aldri_cpsat(self):
         ansatte = ansatte_12t(6, helg_hver_n=0)
         los = cpsat_generator.loes_med_cpsat(
@@ -168,6 +175,7 @@ class MotorerTest(unittest.TestCase):
             for s in los.tildelinger[a.id]:
                 self.assertLess(s.dato.weekday(), 5)
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_preferanser_paa_navn_inkl_mellomvakt(self):
         mellom = SkiftDef("MELLOM", 11.5, 19, dager=("hverdag",))
         ansatte = [radiograf("Mellomfan", {"R\u00f8ntgen"}, foretrekker={"MELLOM"})]
@@ -191,6 +199,7 @@ class MotorerTest(unittest.TestCase):
         self.assertFalse(regler.matcher({"NATT"}, DAG12))
         self.assertTrue(regler.matcher({"DAG"}, DAG))
 
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
     def test_skift_tilgang_kombinerer_grupper(self):
         gruppe_a = [
             radiograf(f"Dag{i}", {"R\u00f8ntgen"}, skift_tilgang={"DAG", "KVELD"}, helg_hver_n=3)
@@ -224,6 +233,84 @@ class MotorerTest(unittest.TestCase):
         self.assertTrue(any("Skifttilgang" in f for f in feil))
         self.assertFalse(regler.kandidat_er_lovlig(a, [], Skift(START, NATT)))
         self.assertTrue(regler.kandidat_er_lovlig(a, [], Skift(START, DAG)))
+
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
+    def test_ukeshvile_40t_hvile_cpsat(self):
+        a = radiograf("Ana", {"R\u00f8ntgen"})
+        b = radiograf("Bora", {"R\u00f8ntgen"})
+        ansatte = [a, b]
+        bemanning = {"DAG": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}}}
+        behov = bygg_behov(bemanning, [DAG])
+        laaste = [
+            (a.id, Skift(START + timedelta(days=d), DAG)) for d in (0, 1, 2, 3, 5, 7, 8, 9, 10, 12)
+        ]
+        los = cpsat_generator.loes_med_cpsat(
+            ansatte, behov, START, 14, [DAG], 40.0, tidsbegrensning=25.0, laaste=laaste
+        )
+        self.assertIsNotNone(los)
+        self.assertEqual(los.laaste_feilet, [])
+        self.assertEqual(regler.valider_plan(los.tildelinger, ansatte, behov, START, 14, [DAG], True), [])
+
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
+    def test_rettferdig_fordeling_stillingsprosent_cpsat(self):
+        a = radiograf("Ana", {"R\u00f8ntgen"}, foretrekker={"DAG"})
+        b = radiograf("Bora", {"R\u00f8ntgen"})
+        c = radiograf("Cara", {"R\u00f8ntgen"}, stillingsprosent=50.0)
+        ansatte = [a, b, c]
+        bemanning = {"DAG": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}}}
+        behov = bygg_behov(bemanning, [DAG])
+        los = cpsat_generator.loes_med_cpsat(
+            ansatte, behov, START, 14, [DAG], 40.0, tidsbegrensning=25.0
+        )
+        self.assertIsNotNone(los)
+        per_pct = {
+            x.id: sum(s.varighet.total_seconds() / 3600 for s in los.tildelinger[x.id])
+            / (x.stillingsprosent / 100)
+            for x in ansatte
+        }
+        self.assertLessEqual(max(per_pct.values()) - min(per_pct.values()), 8.5)
+
+    def test_hall_motbevis_valider_plan(self):
+        p1 = radiograf("P1", {"CT"})
+        p2 = radiograf("P2", {"CT"})
+        p3 = radiograf("P3", {"MR", "Ultralyd"})
+        ansatte = [p1, p2, p3]
+        bemanning = {"DAG": {"CT": {"hverdag": 1, "helg": 0}, "MR": {"hverdag": 1, "helg": 0}, "Ultralyd": {"hverdag": 1, "helg": 0}}}
+        behov = bygg_behov(bemanning, [DAG])
+        plan = {a.id: [Skift(START, DAG)] for a in ansatte}
+        feil = regler.valider_plan(plan, ansatte, behov, START, 1, [DAG], True)
+        self.assertTrue(any("krever 3" in f or "fylle" in f for f in feil), feil)
+
+        p3b = radiograf("P3b", {"MR", "Ultralyd"})
+        p1b = radiograf("P1b", {"CT"})
+        p2b = radiograf("P2b", {"MR"})
+        ansatte2 = [p1b, p2b, p3b]
+        plan2 = {a.id: [Skift(START, DAG)] for a in ansatte2}
+        feil2 = regler.valider_plan(plan2, ansatte2, behov, START, 1, [DAG], True)
+        self.assertEqual(feil2, [])
+
+    def test_ics_fold_teangrenser(self):
+        from turnus.ics_export import _fold
+        linje = "SUMMARY:" + "a" * 66 + "\u00f8re-\u00c5se"
+        foldet = _fold(linje)
+        sammen = foldet.replace("\r\n ", "")
+        self.assertEqual(sammen, linje)
+        for linje_del in foldet.split("\r\n"):
+            self.assertLessEqual(len(linje_del.encode("utf-8")), 75)
+
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
+    def test_laast_vakt_uten_kompetanse_cpsat(self):
+        a = radiograf("Ana", {"R\u00f8ntgen"})
+        b = radiograf("Bora", {"R\u00f8ntgen"})
+        ansatte = [a, b]
+        bemanning = {"DAG": {"CT": {"hverdag": 1, "helg": 0}}}
+        behov = bygg_behov(bemanning, [DAG])
+        laaste = [(a.id, Skift(START, DAG))]
+        los = cpsat_generator.loes_med_cpsat(
+            ansatte, behov, START, 1, [DAG], 40.0, tidsbegrensning=25.0, laaste=laaste
+        )
+        self.assertIsNotNone(los)
+        self.assertEqual(len(los.laaste_feilet), 1, los.laaste_feilet)
 
     def test_ansatte_lager_rundertrip_navn_preferanser(self):
         with tempfile.TemporaryDirectory() as tmp:

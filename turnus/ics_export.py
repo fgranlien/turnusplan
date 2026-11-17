@@ -19,15 +19,18 @@ def _esc(tekst: str) -> str:
 
 
 def _fold(linje: str) -> str:
-    data = linje.encode("utf-8")
-    if len(data) <= 75:
-        return linje
-    deler = [data[:75]]
-    data = data[75:]
-    while data:
-        deler.append(b" " + data[:74])
-        data = data[74:]
-    return b"\r\n".join(deler).decode("utf-8", errors="ignore")
+    deler: list[str] = []
+    naa = ""
+    n = 0
+    for ch in linje:
+        b = len(ch.encode("utf-8"))
+        if n + b > 75:
+            deler.append(naa)
+            naa, n = " ", 1
+        naa += ch
+        n += b
+    deler.append(naa)
+    return "\r\n".join(deler)
 
 
 def bygg_ics(

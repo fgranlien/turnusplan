@@ -3,6 +3,23 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.21 – Feilretting etter v3.0-gjennomgang
+
+- **Hall-matching i `valider_plan`:** per-krav-sjekken godtok bemanninger
+  der kompetansene overlapper (motbevis: P1{CT}, P2{CT}, P3{MR, Ultralyd}
+  mot kravene CT+MR+Ultralyd ble godtatt selv om 3 plasser ikke kan fylles
+  av 3 personer). Ny `maks_matching` (Kuhn) sjekker nå at alle plasser kan
+  fylles samtidig; rammer også vaktbytte og importerte planer
+- **CP-SAT-ukeshvile:** `timedelta(hours=regler.MIN_UKESHVILE)` krasjet
+  (MIN_UKESHVILE er allerede en timedelta) og fikk alle CP-SAT-løp til å
+  feile; brukes nå direkte
+- **iCal-eksport:** `_fold` kuttet på bytegrenser og kunne miste tegn (æøå)
+  som deles av en fold-grense; kutter nå på tegngrenser (maks 75 byte per
+  linje, fortsettelseslinjer med mellomrom)
+- **Tester:** CP-SAT-avhengige tester hoppes nå pent over med
+  `skipUnless(cpsat_generator.tilgjengelig())` når ortools mangler,
+  i stedet for å feile med importfeil
+
 ## 2.20 – Kombinere turnusgrupper: hard skift-tilgang per ansatt
 
 - Ny kolonne «Skift» i Ansatte-fanen: kommaseparert liste av skiftnavnet
