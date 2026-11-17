@@ -3,6 +3,28 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.22 – Ønsketolking med lokal LLM (Ollama)
+
+- Nytt valgfritt felt i Ansatte-fanen: skriv ønsker i fritekst
+  (f.eks. «ikke natt, helst 12-timersvakter annenhver helg, fravær
+  1. til 14. juli 2025»), velg ansatt, og la en lokal LLM via Ollama
+  oversette til strukturerte feltverdier
+- Forslag vises som tabell (nå → forslag) og brukes først når du
+  klikker «Bruk forslag»; deretter «Lagre ansatte» som før
+- Støttede felt: foretrekker, unngå, skift-tilgang, fravær (datoer og
+  intervaller), 12-t/uke, helg hver N., stillingsprosent
+- All tolking skjer lokalt på din egen maskin (Ollama på
+  127.0.0.1:11434) – ingen ansatdata sendes til skyen; modellvelger
+  fylles automatisk fra installerte modeller, standard kan settes med
+  miljøvariabelen `TURNUS_OLLAMA_MODELL`
+- Modellen kan ikke skape ulovlige turnuser: den foreslår bare
+  preferanser, og generatoren + valider_plan håndhever aml som før;
+  ukjente felt, ugyldige skiftnavn, datoer og tall filtreres bort med
+  advarsler
+- Ny modul `turnus/llm_tolk.py` (kun standardbiblioteket), endepunktene
+  `/api/llm/status` og `/api/tolk-onsker`, og 6 nye enhetstester for
+  sanitering og promptbygging (23 tester totalt)
+
 ## 2.21 – Feilretting etter v3.0-gjennomgang
 
 - **Hall-matching i `valider_plan`:** per-krav-sjekken godtok bemanninger

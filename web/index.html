@@ -17,7 +17,8 @@ main { max-width:1000px; margin:0 auto; padding:16px 32px 48px; }
 .rad { display:flex; flex-wrap:wrap; gap:16px; align-items:end; }
 label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--grå); }
 label.sjekk { flex-direction:row; align-items:center; gap:8px; padding-bottom:10px; }
-input[type=date], input[type=number], input[type=text], select { padding:8px 10px; border:1px solid var(--linje); border-radius:8px; font-size:14px; background:#fff; color:var(--tekst); }
+input[type=date], input[type=number], input[type=text], select, textarea { padding:8px 10px; border:1px solid var(--linje); border-radius:8px; font-size:14px; background:#fff; color:var(--tekst); font-family:inherit; }
+textarea { resize:vertical; }
 button { background:var(--blå); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; }
 button:disabled { opacity:.5; cursor:default; }
 table { border-collapse:collapse; width:100%; font-size:13.5px; margin-top:8px; }
@@ -224,6 +225,15 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
     <h2>Ansatte</h2>
     <p class="laster" id="ansatte-kilde"></p>
     <div id="ansatte-tabell"></div>
+    <div class="rad" style="margin-top:16px;align-items:flex-end">
+      <label style="flex:1;min-width:280px">Ønsker med fritekst (valgfri AI-hjelp via Ollama, kjøres lokalt)
+        <textarea id="ai-fritekst" rows="2" style="width:100%" placeholder="f.eks. «ikke natt, helst 12-timersvakter annenhver helg, fravær 1. til 14. juli 2025»"></textarea>
+      </label>
+      <label>Gjelder <select id="ai-ansatt"></select></label>
+      <label>Modell <select id="ai-modell"></select></label>
+      <button id="ai-knapp" onclick="tolkOnsker()">Tolk ønsker</button>
+    </div>
+    <div id="ai-status"></div>
     <div class="rad" style="margin-top:14px">
       <button onclick="leggTilAnsatt()">+ Legg til ansatt</button>
       <button id="lagre-ansatte-knapp" onclick="lagreAnsatte()">Lagre ansatte</button>
@@ -458,9 +468,104 @@ async function lastAnsatte() {
       : 'Viser demopool – rediger og lagre for å bruke egne ansatte i stedet.';
     renderAnsatte();
     fyllLaasValg();
+    fyllAiValg();
+    lastLlmStatus();
   } catch (e) {
     document.getElementById('ansatte-status').innerHTML = `<div class="status brudd">Kunne ikke laste ansatte: ${esc(e.message)}</div>`;
   }
+}
+
+async function lastLlmStatus() {
+  const status = document.getElementById('ai-status');
+  const knapp = document.getElementById('ai-knapp');
+  const modellSel = document.getElementById('ai-modell');
+  try {
+    const r = await fetch('/api/llm/status');
+    const d = await r.json();
+    modellSel.innerHTML = (d.modeller || []).map(m => `<option value="${esc(m)}" ${m === d.standard ? 'selected' : ''}>${esc(m)}</option>`).join('') || `<option value="">${esc(d.standard)}</option>`;
+    if (!d.tilgjengelig) {
+      knapp.disabled = true;
+      knapp.title = 'Krever Ollama lokalt';
+      status.innerHTML = `<div class="status">AI-tolking krever <b>Ollama</b> lokalt: installer fra ollama.com, last ned en modell med <code>ollama pull ${esc(d.standard)}</code> og last siden på nytt. Alt kjøres på din egen maskin.</div>`;
+    } else {
+      knapp.disabled = false;
+    }
+  } catch (e) {
+    knapp.disabled = true;
+    status.innerHTML = `<div class="status">Kunne ikke sjekke Ollama: ${esc(e.message)}</div>`;
+  }
+}
+
+function fyllAiValg() {
+  const sel = document.getElementById('ai-ansatt');
+  if (!sel) return;
+  sel.innerHTML = ansatteListe.map((a, i) => `<option value="${i}">${esc(a.navn)}</option>`).join('');
+}
+
+async function tolkOnsker() {
+  const status = document.getElementById('ai-status');
+  const fritekst = document.getElementById('ai-fritekst').value.trim();
+  const idx = +document.getElementById('ai-ansatt').value;
+  const modell = document.getElementById('ai-modell').value;
+  if (!fritekst) { status.innerHTML = '<div class="status">Skriv først inn ønsker i tekstfeltet.</div>'; return; }
+  if (!ansatteListe[idx]) { status.innerHTML = '<div class="status">Velg hvem ønsket gjelder.</div>'; return; }
+  status.innerHTML = '<div class="laster">Modellen tenker … (kan ta opp til et par minutter lokalt)</div>';
+  try {
+    const r = await fetch('/api/tolk-onsker', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fritekst, ansatt: ansatteListe[idx], skift: skiftListe.map(s => s.navn), modaliteter: MODALITETER, modell }) });
+    const d = await r.json();
+    if (!r.ok) { status.innerHTML = `<div class="status brudd">${esc(d.feil || 'Tolking feilet')}</div>`; return; }
+    visTolkForslag(idx, d);
+  } catch (e) {
+    status.innerHTML = `<div class="status brudd">${esc(e.message)}</div>`;
+  }
+}
+
+function visTolkForslag(idx, d) {
+  const a = ansatteListe[idx];
+  const navn = (f) => ({foretrekker: 'Foretrekker', unnga: 'Unngå', utilgjengelige_dager: 'Fravær', langvakt_uke_maks: '12-t/uke', helg_hver_n: 'Helg hver N.', skift_tilgang: 'Skift', stillingsprosent: 'Stilling %'})[f] || f;
+  let rader = '';
+  for (const [felt, verdi] of Object.entries(d.felter)) {
+    const vis = Array.isArray(verdi) ? verdi.join(', ') : String(verdi);
+    const naa = Array.isArray(a[felt]) ? (a[felt] || []).join(', ') : (a[felt] ?? '–');
+    rader += `<tr><td><b>${esc(navn(felt))}</b></td><td>${esc(String(naa) || '–')}</td><td>${esc(vis || '–')}</td></tr>`;
+  }
+  const advarsel = (d.advarsler || []).map(x => `<div class="status">${esc(x)}</div>`).join('');
+  const status = document.getElementById('ai-status');
+  status.innerHTML = `<div class="card" style="margin-top:10px"><h3 style="margin-top:0">Forslag for ${esc(a.navn)} <span class="laster">(modell: ${esc(d.modell)})</span></h3>
+    <table><tr><th>Felt</th><th>Nå</th><th>Forslag</th></tr>${rader}</table>
+    <p class="laster">Felter som foreslås erstatter nåværende verdier. Fraværsdatoer legges til de eksisterende.</p>
+    ${advarsel}
+    <div class="rad" style="margin-top:10px"><button onclick="bruksTolkForslag(${idx})">Bruk forslag</button> <button style="background:var(--grå)" onclick="document.getElementById('ai-status').innerHTML=''">Avbryt</button></div>
+  </div>`;
+}
+
+function bruksTolkForslag(idx) {
+  const status = document.getElementById('ai-status');
+  const kort = status.querySelector('.card');
+  const a = ansatteListe[idx];
+  if (!a || !kort) return;
+  const tabell = kort.querySelector('table');
+  const navnTilFelt = {'Foretrekker': 'foretrekker', 'Unngå': 'unnga', 'Fravær': 'utilgjengelige_dager', '12-t/uke': 'langvakt_uke_maks', 'Helg hver N.': 'helg_hver_n', 'Skift': 'skift_tilgang', 'Stilling %': 'stillingsprosent'};
+  for (const tr of tabell.querySelectorAll('tr')) {
+    const celler = tr.querySelectorAll('td');
+    if (celler.length < 3) continue;
+    const felt = navnTilFelt[celler[0].textContent.trim()];
+    if (!felt) continue;
+    const forslag = celler[2].textContent.trim();
+    if (felt === 'utilgjengelige_dager') {
+      const ny = forslag && forslag !== '–' ? forslag.split(',').map(s => s.trim()).filter(Boolean) : [];
+      a[felt] = [...new Set([...(a[felt] || []), ...ny])];
+    } else if (['foretrekker', 'unnga', 'skift_tilgang'].includes(felt)) {
+      a[felt] = forslag && forslag !== '–' ? forslag.split(',').map(s => s.trim()).filter(Boolean) : [];
+    } else if (felt === 'stillingsprosent') {
+      a[felt] = +forslag;
+    } else {
+      a[felt] = forslag && forslag !== '–' ? +forslag : null;
+    }
+  }
+  renderAnsatte();
+  status.innerHTML = '<div class="status ok">Forslag brukt – husk å klikke «Lagre ansatte».</div>';
 }
 
 function renderAnsatte() {

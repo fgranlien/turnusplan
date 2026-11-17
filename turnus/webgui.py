@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import VERSJON, ansatte_lager, forvalg_lager, regler, skift_lager
+from . import VERSJON, ansatte_lager, forvalg_lager, llm_tolk, regler, skift_lager
 from .demo_data import MODALITETER, bygg_ansatte, bygg_behov, standard_bemanning
 from .ics_export import bygg_ics
 from .modeller import SkiftDef
@@ -521,6 +521,8 @@ class Handler(BaseHTTPRequestHandler):
                 "skift": [skift_lager.til_rad(d) for d in defs],
             }
             self._send(200, json.dumps(resultat, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+        elif sti == "/api/llm/status":
+            self._send(200, json.dumps(llm_tolk.ollama_status(), ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         else:
             self._send(404, b"ikke funnet", "text/plain; charset=utf-8")
 
@@ -582,6 +584,15 @@ class Handler(BaseHTTPRequestHandler):
                     str(data.get("navn_b", "")).strip(),
                     str(data.get("dato", "")).strip(),
                     str(data.get("skift", "")).strip(),
+                )
+            elif sti == "/api/tolk-onsker":
+                data = json.loads(kropp)
+                resultat = llm_tolk.tolk(
+                    str(data.get("fritekst", "")),
+                    data.get("ansatt") or {},
+                    [str(s) for s in (data.get("skift") or [])],
+                    [str(m) for m in (data.get("modaliteter") or [])],
+                    str(data.get("modell") or "") or None,
                 )
             elif sti == "/api/ansatte":
                 data = json.loads(kropp)

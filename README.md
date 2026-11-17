@@ -193,6 +193,20 @@ tests/
                    og krever at begge består samme regelvalidering
 ```
 
+## Ønsker med fritekst (valgfri AI via Ollama)
+
+I Ansatte-fanen kan du skrive en ansattes ønsker i fritekst og få dem
+oversatt til strukturerte felt (foretrekker, unngå, fravær, helgrullering
+osv.). Dette krever [Ollama](https://ollama.com) installert lokalt:
+
+```bash
+ollama pull llama3.1   # eller en annen modell
+```
+
+Alt kjøres på din egen maskin – ingen ansatdata sendes ut. Modellen
+foreslår bare preferanser; du ser og bekrefter forslaget før det brukes,
+og generatoren håndhever fortsatt alle aml-regler selv.
+
 ## Utvidelsespunkter
 
 - Egne skifftyper: legg til `SkiftDef` i `modeller.py` (start/slutt-time, `er_natt`)
