@@ -14,6 +14,7 @@ UNNGA_STRAFF = 3.0
 RETTFERDIGHET_VEKT = 2.0
 NATT_BALANSE_VEKT = 0.5
 SAMMENHENGENDE_STRAFF = 0.3
+SAMLET_HELG_BONUS = 1.5
 YRKESGRUPPER = {"fagradiograf", "radiograf"}
 FAGRA_MODALITET_STRAFF = 1.5
 
@@ -147,13 +148,15 @@ class TurnusGenerator:
         if skift.type.er_natt:
             s -= NATT_BALANSE_VEKT * sum(1 for x in tildelt if x.type.er_natt)
 
+        helg_forrige = skift.dato.weekday() == 6 and (skift.dato - timedelta(days=1)).weekday() == 5
+        helg_neste = skift.dato.weekday() == 5 and (skift.dato + timedelta(days=1)).weekday() == 6
         forrige = self._skift_paa_dag(ansatt.id, skift.dato - timedelta(days=1))
         neste = self._skift_paa_dag(ansatt.id, skift.dato + timedelta(days=1))
         if forrige is not None:
             diff = (skift.type.start_time - forrige.type.start_time) % 24
             s += ROTASJON_BONUS.get(diff, 0.0) - BAKLENGS_STRAFF.get(diff, 0.0)
-            s -= SAMMENHENGENDE_STRAFF
-        if neste is not None:
+            s += SAMLET_HELG_BONUS if helg_forrige else -SAMMENHENGENDE_STRAFF
+        if neste is not None and not helg_neste:
             s -= SAMMENHENGENDE_STRAFF
         return s
 

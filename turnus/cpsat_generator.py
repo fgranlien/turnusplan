@@ -9,6 +9,7 @@ from .modeller import Ansatt, Krav, Skift, SkiftDef
 PREF_BONUS = 2.0
 UNNGA_STRAFF = 3.0
 FAGRA_MODALITET_STRAFF = 1.5
+SAMLET_HELG_STRAFF = 1.5
 AVVIK_VEKT = 0.1
 NATT_BALANSE_VEKT = 0.2
 SLAKK_STRAFF = 1000.0
@@ -273,6 +274,21 @@ def loes_med_cpsat(
                 obj.append(-int(PREF_BONUS * 10) * v)
             if regler.matcher(a.unnga, sd):
                 obj.append(int(UNNGA_STRAFF * 10) * v)
+
+    for a in ansatte:
+        for u in range(antall_uker):
+            lordag = uker_start + timedelta(days=7 * u + 5)
+            sondag = lordag + timedelta(days=1)
+            if lordag not in datoer_set or sondag not in datoer_set:
+                continue
+            lordag_vars = [x[a.id, lordag, sd.navn] for sd in skift_defs if (a.id, lordag, sd.navn) in x]
+            sondag_vars = [x[a.id, sondag, sd.navn] for sd in skift_defs if (a.id, sondag, sd.navn) in x]
+            if not lordag_vars or not sondag_vars:
+                continue
+            begge = model.NewBoolVar(f"helg_begge_{a.id}_{u}")
+            model.Add(begge <= sum(lordag_vars))
+            model.Add(begge <= sum(sondag_vars))
+            obj.append(int(SAMLET_HELG_STRAFF * 10) * (sum(lordag_vars) + sum(sondag_vars) - 2 * begge))
 
     natt_vars_liste = []
     for a in ansatte:

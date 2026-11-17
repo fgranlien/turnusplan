@@ -180,6 +180,16 @@ button, input, select, textarea, .tabbar button, .card, .dropzone { transition: 
           <option value="33.6">33,6 t – helkontinuerlig/sammenlignbart skiftarbeid</option>
         </select>
       </label>
+      <label>Helgefrekvens (alle uten eget ønske)
+        <select id="helg-frekvens" title="Gjelder alle ansatte som ikke har egen «Helg hver N.»-verdi. Ansatte med egen verdi beholder den.">
+          <option value="">Ingen begrensning</option>
+          <option value="1">Hver helg</option>
+          <option value="2">Hver 2. helg</option>
+          <option value="3">Hver 3. helg</option>
+          <option value="4">Hver 4. helg</option>
+          <option value="0">Aldri helg</option>
+        </select>
+      </label>
       <label>Motor
         <span class="segment" id="motor-segment">
           <button type="button" class="aktiv" data-motor="greedy" onclick="settMotor('greedy')" title="Rask heuristikk, alltid på under et sekund">Rask (greedy)</button>
@@ -826,6 +836,7 @@ async function generer() {
                             rotasjon: document.getElementById('rotasjon').checked,
                             syklus_uker: +document.getElementById('syklus').value || 4,
                             motor: document.getElementById('motor').value,
+                            helg_hver_n: document.getElementById('helg-frekvens').value === '' ? null : +document.getElementById('helg-frekvens').value,
                             laaste: laasteVakter})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.feil || r.status);
@@ -1081,6 +1092,7 @@ function lagreInnstillinger() {
       motor: document.getElementById('motor').value,
       rotasjon: document.getElementById('rotasjon').checked,
       syklus: document.getElementById('syklus').value,
+      helg_frekvens: document.getElementById('helg-frekvens').value,
     }));
   } catch (e) {}
 }
@@ -1094,6 +1106,7 @@ function hentInnstillinger() {
     if (s.motor) settMotor(s.motor);
     if (s.rotasjon !== undefined) document.getElementById('rotasjon').checked = s.rotasjon;
     if (s.syklus) document.getElementById('syklus').value = s.syklus;
+    if (s.helg_frekvens !== undefined) document.getElementById('helg-frekvens').value = s.helg_frekvens;
   } catch (e) {}
 }
 

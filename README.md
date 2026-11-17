@@ -193,6 +193,14 @@ tests/
                    og krever at begge består samme regelvalidering
 ```
 
+## Helger
+
+- **Samlete helger:** generatoren foretrekker at lørdag og søndag i samme
+  helg jobbes av samme person (både greedy og CP-SAT)
+- **Helgefrekvens:** i Generer-fanen velger du hvor ofte helg jobbes for
+  hele planen (hver helg, hver 2./3./4., aldri). Gjelder alle som ikke har
+  egen «Helg hver N.»-verdi i Ansatte-fanen; egne ønsker beholder forrang
+
 ## Ønsker med fritekst (valgfri AI via Ollama)
 
 I Ansatte-fanen kan du skrive en ansattes ønsker i fritekst og få dem

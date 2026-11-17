@@ -138,6 +138,15 @@ def matcher(onsker: set[str], skift_def: SkiftDef) -> bool:
 _EPOCH_LORDAG = date(2020, 1, 4)
 
 
+def sett_global_helgfrekvens(ansatte: list[Ansatt], n: int | None) -> None:
+    """Sett helgefrekvens for alle som ikke har eget ønske (None = ingen endring)."""
+    if n is None:
+        return
+    for ansatt in ansatte:
+        if ansatt.helg_hver_n is None:
+            ansatt.helg_hver_n = max(0, min(12, int(n)))
+
+
 def sett_helg_offsatter(ansatte: list[Ansatt]) -> None:
     teller: dict[int, int] = {}
     for ansatt in sorted(ansatte, key=lambda a: a.id):

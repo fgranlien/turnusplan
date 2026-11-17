@@ -3,6 +3,25 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.24 – Samlete helger og global helgefrekvens
+
+- **Helger jobbes samlet:** begge motorer foretrekker nå at lørdag og
+  søndag i samme helg jobbes av samme person, i stedet for å straffe
+  sammenhengende dager (lørdag én uke, søndag neste er borte). Greedy:
+  samlet-helg-bonus som erstatter straffen for sammenhengende dager
+  lørdag→søndag; CP-SAT: XOR-straff for delte helger (jobber én av dagene
+  uten den andre = straff). Krav om dekning og aml-regler går fortsatt foran
+- **Nytt valg «Helgefrekvens» i Generer-fanen:** hvor ofte man jobber helg
+  for hele planen (hver helg, hver 2./3./4., aldri, eller ingen begrensning).
+  Gjelder alle ansatte som ikke har egen «Helg hver N.»-verdi – egne ønsker
+  beholder forrang, så kombinerte turnusgrupper (v2.20) fortsatt fungerer.
+  Håndheves hardt av begge motorer; umulig bemanning vises som udekket
+  behov med forslag
+- Valget lagres i GUI-innstillingene og sendes gjennom `/api/generer`
+- 4 nye tester: samlet helg i greedy og CP-SAT (0 delte helger i
+  testscenario), global frekvens setter bare manglende verdier, og at
+  frekvensen håndheves i generert plan (27 tester totalt)
+
 ## 2.23 – GUI-modernisering: flyt, valg og visuell oppfriskning
 
 - **Stegnumreert flyt i Generer-fanen:** 1 Periode og motor, 2 Skift og

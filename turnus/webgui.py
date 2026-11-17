@@ -35,6 +35,15 @@ def _host_navn(host: str) -> str:
     return host.rsplit(":", 1)[0]
 
 
+def _helg_arg(verdi) -> int | None:
+    if verdi is None or verdi == "":
+        return None
+    try:
+        return max(0, min(12, int(verdi)))
+    except (TypeError, ValueError):
+        return None
+
+
 def generer_json(
     start: date,
     antall_dager: int,
@@ -46,6 +55,7 @@ def generer_json(
     syklus_uker: int = 4,
     motor: str = "greedy",
     laaste: list[dict] | None = None,
+    helg_hver_n: int | None = None,
 ) -> dict:
     defs = skift_defs if skift_defs is not None else skift_lager.skift_defs_for(langvakter)
     bemanning_cfg = standard_bemanning(defs)
@@ -67,6 +77,7 @@ def generer_json(
     else:
         ansatte = bygg_ansatte(behov, defs)
         ansatte_kilde = "demo"
+    regler.sett_global_helgfrekvens(ansatte, helg_hver_n)
     regler.sett_helg_offsatter(ansatte)
     rotasjon_arg = (syklus_uker * 7, len(defs)) if rotasjon and syklus_uker > 0 else None
     laaste_par, laaste_avvist = _laaste_par(laaste, ansatte, defs, start, antall_dager)
@@ -554,6 +565,7 @@ class Handler(BaseHTTPRequestHandler):
                     bool(data.get("rotasjon")), int(data.get("syklus_uker", 4) or 4),
                     str(data.get("motor", "greedy")),
                     data.get("laaste"),
+                    _helg_arg(data.get("helg_hver_n")),
                 )
             elif sti == "/api/skift":
                 data = json.loads(kropp)

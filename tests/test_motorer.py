@@ -331,3 +331,64 @@ class MotorerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class HelgTest(unittest.TestCase):
+    def samlet_helg_scenario(self):
+        ansatte = ansatte_12t(9)
+        bemanning = {
+            "DAG12": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}},
+            "NATT12": {"R\u00f8ntgen": {"hverdag": 1, "helg": 0}},
+        }
+        return ansatte, bygg_behov(bemanning, [DAG12, NATT12]), [DAG12, NATT12]
+
+    @staticmethod
+    def delte_helger(tildelinger, ansatte, start, dager):
+        delte = 0
+        for a in ansatte:
+            helg_dager = {
+                (s.dato - timedelta(days=s.dato.weekday())): set()
+                for s in tildelinger[a.id] if s.dato.weekday() >= 5
+            }
+            for s in tildelinger[a.id]:
+                if s.dato.weekday() >= 5:
+                    helg_dager[s.dato - timedelta(days=s.dato.weekday())].add(s.dato.weekday())
+            for dager_i_helg in helg_dager.values():
+                if dager_i_helg == {5} or dager_i_helg == {6}:
+                    delte += 1
+        return delte
+
+    def test_samlet_helg_greedy(self):
+        ansatte, behov, defs = self.samlet_helg_scenario()
+        plan = TurnusGenerator(ansatte, behov, START, 28, defs).generer()
+        self.assertEqual(plan.udekket, [])
+        self.assertEqual(self.delte_helger(plan.tildelinger, ansatte, START, 28), 0)
+
+    @unittest.skipUnless(cpsat_generator.tilgjengelig(), "ortools er ikke installert")
+    def test_samlet_helg_cpsat(self):
+        ansatte, behov, defs = self.samlet_helg_scenario()
+        los = cpsat_generator.loes_med_cpsat(ansatte, behov, START, 28, defs, tidsbegrensning=25.0)
+        self.assertIsNotNone(los)
+        self.assertEqual(self.delte_helger(los.tildelinger, ansatte, START, 28), 0)
+
+    def test_global_helgfrekvens_setter_bare_manglende(self):
+        a = radiograf("UtenOnske", {"R\u00f8ntgen"})
+        b = radiograf("MedOnske", {"R\u00f8ntgen"}, helg_hver_n=0)
+        regler.sett_global_helgfrekvens([a, b], 3)
+        self.assertEqual(a.helg_hver_n, 3)
+        self.assertEqual(b.helg_hver_n, 0)
+        regler.sett_global_helgfrekvens([a, b], None)
+        self.assertEqual(a.helg_hver_n, 3)
+
+    def test_global_helgfrekvens_haandheves(self):
+        ansatte = ansatte_12t(9, helg_hver_n=None)
+        regler.sett_global_helgfrekvens(ansatte, 2)
+        regler.sett_helg_offsatter(ansatte)
+        bemanning = {"DAG12": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}}}
+        behov = bygg_behov(bemanning, [DAG12])
+        plan = TurnusGenerator(ansatte, behov, START, 28, [DAG12]).generer()
+        for a in ansatte:
+            for s in plan.tildelinger[a.id]:
+                if s.dato.weekday() >= 5:
+                    self.assertTrue(regler.helgfrekvens_ok(a, s.dato), f"{a.navn} jobbet helg {s.dato}")
+        jobbet_helg = {a.id for a in ansatte if any(s.dato.weekday() >= 5 for s in plan.tildelinger[a.id])}
+        self.assertTrue(jobbet_helg)
