@@ -24,6 +24,16 @@ UKEDAGER = ["man", "tir", "ons", "tor", "fre", "lør", "søn"]
 _siste_eksport: dict[str, str] = {}
 _siste_plan: dict | None = None
 
+MAKS_KROPP = 5 * 1024 * 1024
+_LOKALE_HOSTER = {"localhost", "127.0.0.1", "[::1]"}
+
+
+def _host_navn(host: str) -> str:
+    host = (host or "").strip().lower()
+    if host.startswith("["):
+        return host.split("]", 1)[0] + "]"
+    return host.rsplit(":", 1)[0]
+
 
 def generer_json(
     start: date,
@@ -178,6 +188,25 @@ def _resultat_fra_plan(
         motor_info = {"navn": "greedy", "status": "", "tid": None, "merknad": ""}
     med_id = {a.id: a for a in ansatte}
 
+    koder_defs: dict[str, str] = {}
+    for sd in defs:
+        kode = sd.navn[0].upper()
+        if kode in koder_defs.values():
+            kode = sd.navn[:2].upper()
+        if kode in koder_defs.values():
+            kode = sd.navn[:2].upper() + str(sum(1 for k in koder_defs.values() if k.startswith(sd.navn[:2].upper())))
+        koder_defs[sd.navn] = kode
+    faste_klasser = {"D": "c-d", "K": "c-k", "N": "c-n", "M": "c-m"}
+    ekstra_klasser = ["c-x0", "c-x1", "c-x2", "c-x3"]
+    klasse_koder: dict[str, str] = {}
+    ekstra_i = 0
+    for kode in koder_defs.values():
+        if kode in faste_klasser:
+            klasse_koder[kode] = faste_klasser[kode]
+        else:
+            klasse_koder[kode] = ekstra_klasser[ekstra_i % len(ekstra_klasser)]
+            ekstra_i += 1
+
     uke_start = start - timedelta(days=start.weekday())
     antall_uker = (antall_dager + start.weekday() + 6) // 7
     uker = [
@@ -220,20 +249,20 @@ def _resultat_fra_plan(
         uke_rader = []
         for u in range(antall_uker):
             ws = uke_start + timedelta(days=7 * u)
-            koder = []
+            uke_koder = []
             for d in range(7):
                 dato = ws + timedelta(days=d)
                 if start <= dato < start + timedelta(days=antall_dager):
                     s = skift_per_dag.get(dato)
-                    koder.append(s.type.navn[0] if s else "")
+                    uke_koder.append(koder_defs[s.type.navn] if s else "")
                 else:
-                    koder.append(None)
+                    uke_koder.append(None)
             timer = sum(
                 s.varighet.total_seconds() / 3600
                 for s in skift_liste
                 if ws <= s.dato < ws + timedelta(days=7)
             )
-            uke_rader.append({"timer": round(timer, 1), "skift": koder})
+            uke_rader.append({"timer": round(timer, 1), "skift": uke_koder})
         total_timer = sum(s.varighet.total_seconds() / 3600 for s in skift_liste)
         ansatt_rader.append(
             {
@@ -319,6 +348,8 @@ def _resultat_fra_plan(
             }
             for s, k in udekket
         ],
+        "skift_koder": koder_defs,
+        "skift_klasser": klasse_koder,
         "laaste_feilet": list(getattr(plan, "laaste_feilet", [])) + list(laaste_avvist or []),
         "validering": feil,
         "ics": bygg_ics(plan.tildelinger, ansatte, defs, f"Turnusforslag {start.isoformat()}")
@@ -399,12 +430,17 @@ def vaktbytte_json(navn_a: str, navn_b: str, dato_iso: str, skift_navn: str) -> 
     nye_tildelinger[a.id] = sorted(ny_a)
     nye_tildelinger[b.id] = sorted(ny_b)
 
-    feil = regler.valider_plan(
+    feil_for = regler.valider_plan(
+        ctx["tildelinger"], ctx["ansatte"], ctx["behov"], ctx["start"],
+        ctx["antall_dager"], ctx["defs"], True,
+    )
+    feil_etter = regler.valider_plan(
         nye_tildelinger, ctx["ansatte"], ctx["behov"], ctx["start"],
         ctx["antall_dager"], ctx["defs"], True,
     )
-    if feil:
-        return {"ok": False, "brudd": feil}
+    nye_brudd = [f for f in feil_etter if f not in feil_for]
+    if nye_brudd:
+        return {"ok": False, "brudd": nye_brudd}
 
     ctx["tildelinger"] = nye_tildelinger
     plan = Plan(dict(nye_tildelinger), list(ctx["udekket"]))
@@ -448,7 +484,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(innhold)
 
+    def _avvis(self, melding: str, kode: int = 403) -> None:
+        self._send(kode, json.dumps({"feil": melding}, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+    def _sjekk_lokal_tilgang(self) -> str | None:
+        if _host_navn(self.headers.get("Host")) not in _LOKALE_HOSTER:
+            return "Ugyldig Host-header \u2013 serveren er kun tilgjengelig fra localhost"
+        origin = (self.headers.get("Origin") or "").strip()
+        if origin:
+            vert = urllib.parse.urlsplit(origin).hostname or ""
+            if _host_navn(vert) not in {"localhost", "127.0.0.1", "::1"}:
+                return "Ugyldig Origin \u2013 serveren er kun tilgjengelig fra localhost"
+        return None
+
     def do_GET(self) -> None:
+        feil = self._sjekk_lokal_tilgang()
+        if feil:
+            self._avvis(feil)
+            return
         sti = urllib.parse.urlsplit(self.path).path
         if sti == "/api/eksport":
             spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
@@ -494,10 +547,22 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, b"ikke funnet", "text/plain; charset=utf-8")
 
     def do_POST(self) -> None:
+        sti = urllib.parse.urlsplit(self.path).path
+        feil = self._sjekk_lokal_tilgang()
+        if not feil and sti != "/api/valider":
+            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if ctype != "application/json":
+                feil = "Content-Type må være application/json"
+        if feil:
+            self._avvis(feil)
+            return
         lengde = int(self.headers.get("Content-Length", 0))
+        if lengde > MAKS_KROPP:
+            self._avvis("Forespørselen er for stor (maks 5 MB)", 413)
+            return
         kropp = self.rfile.read(lengde)
         try:
-            if self.path == "/api/generer":
+            if sti == "/api/generer":
                 data = json.loads(kropp)
                 start = date.fromisoformat(data["start"])
                 dager = max(1, min(int(data.get("dager", 14)), 84))
@@ -510,15 +575,15 @@ class Handler(BaseHTTPRequestHandler):
                     str(data.get("motor", "greedy")),
                     data.get("laaste"),
                 )
-            elif self.path == "/api/skift":
+            elif sti == "/api/skift":
                 data = json.loads(kropp)
                 antall, defs = skift_lager.lagre(data)
                 resultat = {"ok": True, "antall": antall, "skift": [skift_lager.til_rad(d) for d in defs]}
-            elif self.path == "/api/forvalg":
+            elif sti == "/api/forvalg":
                 data = json.loads(kropp)
                 profil = forvalg_lager.lagre(data)
                 resultat = {"ok": True, "navn": profil["navn"], "antall": len(forvalg_lager.les_alle())}
-            elif self.path == "/api/forvalg/last":
+            elif sti == "/api/forvalg/last":
                 data = json.loads(kropp)
                 navn = str(data.get("navn", "")).strip()
                 profil = forvalg_lager.les(navn)
@@ -532,7 +597,7 @@ class Handler(BaseHTTPRequestHandler):
                 if isinstance(ansatte, list) and ansatte:
                     ansatte_lager.lagre(ansatte)
                 resultat = {"ok": True, "profil": profil}
-            elif self.path == "/api/vaktbytte":
+            elif sti == "/api/vaktbytte":
                 data = json.loads(kropp)
                 resultat = vaktbytte_json(
                     str(data.get("navn_a", "")).strip(),
@@ -540,11 +605,11 @@ class Handler(BaseHTTPRequestHandler):
                     str(data.get("dato", "")).strip(),
                     str(data.get("skift", "")).strip(),
                 )
-            elif self.path == "/api/ansatte":
+            elif sti == "/api/ansatte":
                 data = json.loads(kropp)
                 antall, advarsler = ansatte_lager.lagre(data)
                 resultat = {"ok": True, "antall": antall, "advarsler": advarsler}
-            elif self.path.startswith("/api/valider"):
+            elif sti.startswith("/api/valider"):
                 spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                 filnavn = spørring.get("filnavn", ["turnus.ics"])[0]
                 prosent = float(spørring.get("prosent", ["100"])[0])
@@ -558,6 +623,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, melding, "application/json; charset=utf-8")
 
     def do_DELETE(self) -> None:
+        feil = self._sjekk_lokal_tilgang()
+        if feil:
+            self._avvis(feil)
+            return
         sti = urllib.parse.urlsplit(self.path).path
         if sti == "/api/forvalg":
             spørring = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)

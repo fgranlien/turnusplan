@@ -5,7 +5,7 @@ Prototype for en radiologisk avdeling som genererer turnusforslag basert på:
 - **Arbeidsmiljøloven kap. 10** som harde begrensninger
 - **Ansattes preferanser og fridager** som myke vektinger
 - **Modalitetskompetanse** per skift som dekningskrav (Røntgen, CT, MR, Ultralyd, Mammografi, Intervensjon)
-- **To yrkesgrupper**: radiograf (én modalitet) og fagradiograf (alle modaliteter, kan dekke alle plasser)
+- **To yrkesgrupper**: radiograf (én eller flere modaliteter) og fagradiograf (én hovedmodalitet, kan i tillegg dekke fagradiograf-plassene)
 - **Bemanning atskilt for hverdag (man–fre) og helg (lør–søn)**
 
 Ledere er ikke med i turnusen (de jobber dagtid). Antall ansatte beregnes
@@ -40,8 +40,9 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
   og preferanser – lagres i `ansatte.json` og brukes av generatoren i stedet
   for demopoolen
 - **Nøyaktig planmotor (OR-Tools CP-SAT)** som valgfritt alternativ til den
-  raske greedy-motoren: modellerer hele horisonten samtidig og finner bevist
-  optimal turnus innen alle aml- og tariffregler. Installer valgfritt med
+  raske greedy-motoren: modellerer hele horisonten samtidig og finner optimal
+  turnus innenfor modellens aml- og tariffregler (optimalitet verifiseres
+  innenfor modellen, ikke mot lovteksten). Installer valgfritt med
   `pip3 install ortools` – uten den brukes greedy automatisk
 - **Helgrullering per ansatt** – kolonnen «Helg hver N.» i Ansatte-fanen:
   3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helg; ansatte med samme
@@ -133,8 +134,8 @@ Alternativt direkte: `python3 main.py --langvakter`. Alt kjører på standardbib
 
 | Regel | Paragraf | Implementering |
 |---|---|---|
-| Minst 11 timer døgnhvile mellom skift | aml §10-4 | `regler.dognhvile_ok` |
-| Minst 35 timer sammenhengende ukeshvile | aml §10-4/10-5 | `regler.ukeshvile_ok` |
+| Minst 11 timer døgnhvile mellom skift | aml §10-8 (1. ledd) | `regler.dognhvile_ok` |
+| Minst 35 timer sammenhengende ukeshvile | aml §10-8 (2. ledd) | `regler.ukeshvile_ok` |
 | Maks 40 timer per uke (skalert med stillingsprosent) | aml §10-2/10-3 | `regler.uketimer_ok` |
 | Maks 9 t per døgn normalt, 10 t utvidet | aml §10-3 | `regler.valider_plan` |
 | Vakter over 10 t krever avtale/tariff, maks 12 t | aml §10-3/10-6 | `langvakt_avtale`-flagg i `regler.kandidat_er_lovlig` |
@@ -155,7 +156,7 @@ Med `--langvakter` brukes DAG12 (07–19) og NATT12 (19–07). Lovlighet ivareta
 - **Preferanser**: +2 for foretrukket skifttype, −3 for skifttype ansatt vil unngå (nattønsker gjelder alle nattskift, også 12 t)
 - **Rettferdighet**: jevn fordeling av arbeidstid relativt til stillingsprosent
 - **Nattbalanse**: jevn fordeling av nattarbeid
-- **Fremoverrotasjon**: senere starttid neste dag belønnes (aml §10-12)
+- **Fremoverrotasjon**: senere starttid neste dag belønnes (anbefalt fremoverrotasjon)
 - **Sammenhengende arbeidsdager**: småstraff for å jobbe mange dager på rad
 
 ## Arkitektur

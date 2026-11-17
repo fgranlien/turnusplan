@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
 from .demo_data import MODALITETER, YRKESGRUPPER
+from .lager import skriv_atomisk
 from .modeller import Ansatt, DAG, DAG12, KVELD, NATT, NATT12, SkiftDef
 from .regler import sett_helg_offsatter
 
@@ -137,14 +139,22 @@ def les_lagrede() -> list[Ansatt] | None:
         return None
     try:
         data = json.loads(FIL.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as e:
+        print(
+            f"ADVARSEL: {FIL.name} kunne ikke leses ({e}) \u2013 bruker demopoolen i stedet.",
+            file=sys.stderr,
+        )
         return None
     if not isinstance(data, list) or not data:
         return None
     try:
         brukte: set[str] = set()
         return [til_ansatt(rad, i, brukte)[0] for i, rad in enumerate(data)]
-    except AnsattFeil:
+    except AnsattFeil as e:
+        print(
+            f"ADVARSEL: {FIL.name} inneholder ugyldige ansattdata ({e}) \u2013 bruker demopoolen i stedet.",
+            file=sys.stderr,
+        )
         return None
 
 
@@ -161,9 +171,14 @@ def lagre(data: list) -> tuple[int, list[str]]:
         ansatte.append(ansatt)
         advarsler.extend(adv)
     sett_helg_offsatter(ansatte)
+    navne_teller: dict[str, int] = {}
+    for a in ansatte:
+        navne_teller[a.navn] = navne_teller.get(a.navn, 0) + 1
+    for navn, antall in navne_teller.items():
+        if antall > 1:
+            advarsler.append(
+                f"{antall} ansatte heter '{navn}' \u2013 navn må være unike for låste vakter, vaktbytte og iCal-eksport."
+            )
     rader = [til_rad(a) for a in ansatte]
-    FIL.write_text(
-        json.dumps(rader, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    skriv_atomisk(FIL, json.dumps(rader, ensure_ascii=False, indent=2) + "\n")
     return len(ansatte), advarsler

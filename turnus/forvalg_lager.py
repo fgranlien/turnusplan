@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+from .lager import skriv_atomisk
 
 FIL = Path(__file__).resolve().parent.parent / "forvalg.json"
 
@@ -15,7 +18,11 @@ def les_alle() -> list[dict]:
         return []
     try:
         data = json.loads(FIL.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as e:
+        print(
+            f"ADVARSEL: {FIL.name} kunne ikke leses ({e}) \u2013 starter uten lagrede forvalg.",
+            file=sys.stderr,
+        )
         return []
     if not isinstance(data, list):
         return []
@@ -38,7 +45,7 @@ def lagre(profil: dict) -> dict:
     profil["navn"] = navn
     alle = [p for p in les_alle() if p.get("navn") != navn]
     alle.append(profil)
-    FIL.write_text(json.dumps(alle, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    skriv_atomisk(FIL, json.dumps(alle, ensure_ascii=False, indent=2) + "\n")
     return profil
 
 
@@ -47,5 +54,5 @@ def slett(navn: str) -> bool:
     resterende = [p for p in alle if p.get("navn") != navn]
     if len(resterende) == len(alle):
         return False
-    FIL.write_text(json.dumps(resterende, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    skriv_atomisk(FIL, json.dumps(resterende, ensure_ascii=False, indent=2) + "\n")
     return True

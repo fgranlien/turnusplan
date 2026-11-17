@@ -1,1 +1,1 @@
-VERSJON = "2.17"
+VERSJON = "2.18"

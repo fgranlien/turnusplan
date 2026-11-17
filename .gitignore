@@ -3,3 +3,4 @@ __pycache__/
 ansatte.json
 skift.json
 forvalg.json
+*.tmp

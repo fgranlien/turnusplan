@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
+from .lager import skriv_atomisk
 from .modeller import LANGVAKT_SKIFT, SkiftDef
 
 FIL = Path(__file__).resolve().parent.parent / "skift.json"
@@ -101,16 +103,17 @@ def les_lagrede() -> list[SkiftDef] | None:
     try:
         data = json.loads(FIL.read_text(encoding="utf-8"))
         return parse_liste(data)
-    except (OSError, json.JSONDecodeError, SkiftFeil):
+    except (OSError, json.JSONDecodeError, SkiftFeil) as e:
+        print(
+            f"ADVARSEL: {FIL.name} kunne ikke leses ({e}) \u2013 bruker standardskiftene i stedet.",
+            file=sys.stderr,
+        )
         return None
 
 
 def lagre(data: list) -> tuple[int, list[SkiftDef]]:
     defs = parse_liste(data)
-    FIL.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    skriv_atomisk(FIL, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     return len(defs), defs
 
 

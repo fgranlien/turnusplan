@@ -3,6 +3,31 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.18 – Sikkerhet og feilretting (etter ekstern kodegjennomgang)
+
+- **GUI-serveren**: Host- og Origin-sjekk (kun localhost aksepteres), krav om
+  `Content-Type: application/json` på JSON-endepunktene og maksgrense 5 MB på
+  forespørselskropp – beskytter mot CSRF/DNS-rebinding mot 127.0.0.1
+- **XSS**: `esc()` escaper nå også enkeltnavnstegn ('), og navn sendes ikke
+  lenger inn i JavaScript-strenger – ukekort og iCal-eksport bruker indeks
+- **Unike skiftkoder** i vaktmatrisen: to skift som begynner på samme bokstav
+  (f.eks. DAG og DAG12) får nå ulike koder (D/DA) med egne farger, og teksten
+  under matrisen lister kodene dynamisk
+- **Vaktbytte** avvises bare hvis byttet tilkommer **nye** regelbrudd – brudd som
+  fantes i planen fra før (f.eks. udekket behov) stopper ikke lenger byttet
+- **Atomisk lagring** av `ansatte.json`, `skift.json` og `forvalg.json`
+  (midlertidig fil + `os.replace`) så en avbrutt lagring ikke ødelegger filen
+- **Advarsel på stderr** hvis en av lagringsfilene er korrupt, i stedet for
+  stille fallback til demodata
+- **Advarsel ved duplikatnavn** når ansatte lagres (navn brukes av låste vakter,
+  vaktbytte og iCal-eksport)
+- **iCal-eksport**: PRODID bruker versjonsnummeret fra koden, linjefolding
+  holder maks 75 byte inkludert fortsettelsesmellomrommet (jf. RFC 5545), og
+  skrivefeilen `dtstemp` er rettet til `dtstamp`
+- **README**: korrigerte lovhenvisningene for døgnhvile og ukeshvile til
+  aml §10-8 (1. og 2. ledd), rettet fagradiograf-beskrivelsen (én hovedmodalitet)
+  og formulerte CP-SAT-optimaliteten mer presist
+
 ## 2.17 – Helgrullering per ansatt
 
 - Ny kolonne «Helg hver N.» i Ansatte-fanen: tom = ingen begrensning,

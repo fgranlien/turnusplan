@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from . import VERSJON
 from .demo_data import MODALITETER
 from .modeller import Ansatt, Skift, SkiftDef
 
-PRODID = "-//turnusplan//turnus 2.5//NO"
+PRODID = f"-//turnusplan//turnus {VERSJON}//NO"
 
 
 def _esc(tekst: str) -> str:
@@ -21,11 +22,12 @@ def _fold(linje: str) -> str:
     data = linje.encode("utf-8")
     if len(data) <= 75:
         return linje
-    deler = []
+    deler = [data[:75]]
+    data = data[75:]
     while data:
-        deler.append(data[:75].decode("utf-8", errors="ignore"))
-        data = data[len(deler[-1].encode("utf-8")):]
-    return ("\r\n ").join(deler)
+        deler.append(b" " + data[:74])
+        data = data[74:]
+    return b"\r\n".join(deler).decode("utf-8", errors="ignore")
 
 
 def bygg_ics(
@@ -35,7 +37,7 @@ def bygg_ics(
     kalender_navn: str = "Turnusforslag",
 ) -> str:
     ansatt_med_id = {a.id: a for a in ansatte}
-    dtstemp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dtstamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     linjer = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
@@ -56,7 +58,7 @@ def bygg_ics(
             linjer += [
                 "BEGIN:VEVENT",
                 f"UID:{uid}",
-                f"DTSTAMP:{dtstemp}",
+                f"DTSTAMP:{dtstamp}",
                 f"DTSTART:{start}",
                 f"DTEND:{slutt}",
                 f"SUMMARY:{_esc(sammendrag)}",

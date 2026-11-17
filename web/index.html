@@ -60,6 +60,10 @@ body.mork td.c-d { background:#1e3229; }
 body.mork td.c-k { background:#3a2c14; }
 body.mork td.c-n { background:#1c2c42; }
 body.mork td.c-m { background:#3a3316; }
+body.mork td.c-x0 { background:#243440; }
+body.mork td.c-x1 { background:#322742; }
+body.mork td.c-x2 { background:#1e322b; }
+body.mork td.c-x3 { background:#3a2722; }
 body.mork td.ute { background:#191e24; }
 body.mork table.matrix td.sum { background:#242c35; }
 body.mork table.matrix td.navn { background:#1d232a; }
@@ -68,6 +72,10 @@ td.c-d { background:#e7f6ee; color:var(--grønn); font-weight:600; }
 td.c-k { background:#fdf1e0; color:#b26a00; font-weight:600; }
 td.c-n { background:#e3ecfa; color:#1c4d8f; font-weight:600; }
 td.c-m { background:#fdf6dd; color:#8a7500; font-weight:600; }
+td.c-x0 { background:#e8f0f7; color:#3d6b8f; font-weight:600; }
+td.c-x1 { background:#efe7f7; color:#5f3d8f; font-weight:600; }
+td.c-x2 { background:#e4f2ec; color:#1f6b52; font-weight:600; }
+td.c-x3 { background:#f7e9e4; color:#8f3d1f; font-weight:600; }
 td.ute { background:#f0f1f3; }
 .badge { display:inline-block; font-size:9px; border-radius:4px; padding:1px 3px; margin-left:3px; background:#eef3fb; color:var(--blå); font-weight:600; vertical-align:middle; }
 body.mork .badge { background:#24303f; }
@@ -230,7 +238,7 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
   </div>
 </main>
 <script>
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 const MODALITETER = ['R\u00f8ntgen', 'CT', 'MR', 'Ultralyd', 'Mammografi', 'Intervensjon'];
 let standardValgte = ['R\u00f8ntgen', 'CT', 'MR'];
@@ -668,21 +676,23 @@ function visUkeMatrix(d) {
     html += '<th>Sum</th>';
   }
   html += '</tr>';
-  for (const a of d.ansatte) {
+  const klasseMap = d.skift_klasser || KLASSE;
+  d.ansatte.forEach((a, ai) => {
     const gruppe = a.yrkesgruppe === 'fagradiograf' ? 'F' : 'R';
     const badges = (a.modaliteter || []).map(m => `<span class="badge">${MOD_KORT[m] || m.slice(0, 2).toUpperCase()}</span>`).join('');
-    html += `<tr><td class="navn" style="cursor:pointer" onclick="visAnsattDetalj('${esc(a.navn)}')" title="Klikk for å se alle vakter"><span class="pill ${esc(a.yrkesgruppe)}">${gruppe}</span> ${esc(a.navn)}${badges}</td>`;
+    html += `<tr><td class="navn" style="cursor:pointer" onclick="visAnsattDetalj(${ai})" title="Klikk for å se alle vakter"><span class="pill ${esc(a.yrkesgruppe)}">${gruppe}</span> ${esc(a.navn)}${badges}</td>`;
     for (const uw of a.uker) {
       for (const k of uw.skift) {
         if (k === null) html += '<td class="ute"></td>';
         else if (!k) html += '<td>·</td>';
-        else html += `<td class="${KLASSE[k] || ''}">${k}</td>`;
+        else html += `<td class="${klasseMap[k] || ''}">${k}</td>`;
       }
       html += `<td class="sum">${uw.timer}</td>`;
     }
     html += `<td class="sum">${Math.round(a.timer)}</td><td class="sum">${a.snitt_uke}</td></tr>`;
-  }
-  return html + '</table></div><p class="laster">D = dag · K = kveld · N = natt · · = fri. F = fagradiograf, R = radiograf. Klikk på navnet for å se alle vakter med klokkeslett.</p>';
+  });
+  const legend = d.skift_koder ? Object.entries(d.skift_koder).map(([navn, kode]) => `${kode} = ${navn}`).join(' · ') : 'D = dag · K = kveld · N = natt';
+  return html + `</table></div><p class="laster">${legend} · · = fri. F = fagradiograf, R = radiograf. Klikk på navnet for å se alle vakter med klokkeslett.</p>`;
 }
 
 function visTariff(d) {
@@ -721,7 +731,8 @@ function lastNedIcs() {
   URL.revokeObjectURL(a.href);
 }
 
-async function lastNedIcsPerson(navn) {
+async function lastNedIcsPerson(idx) {
+  const navn = ((sisteResultat && sisteResultat.ansatte) || [])[idx]?.navn || '';
   try {
     const r = await fetch('/api/eksport?navn=' + encodeURIComponent(navn));
     if (!r.ok) throw new Error('Fant ikke eksport – generer turnusen på nytt');
@@ -782,11 +793,11 @@ function visGenerert(d) {
   const rot = d.rotasjon && d.rotasjon.aktiv;
   html += '<h3>Oppsummering per ansatt</h3><table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Skift</th><th>Timer</th><th>Snitt/uke</th><th>Natt</th>' + (rot ? '<th>Gruppe</th>' : '') + '<th>iCal</th></tr>';
   const norm = d.tariff.norm;
-  for (const a of d.ansatte) {
+  d.ansatte.forEach((a, ai) => {
     const grense = norm * a.prosent / 100;
     const under = a.snitt_uke < grense - 0.5 ? `<span class="under">ⓘ ${(grense - a.snitt_uke).toFixed(1)} t under</span>` : '';
-    html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}${under}</td><td>${a.natt}</td>${rot ? `<td>${a.rotasjonsgruppe || ''}</td>` : ''}<td><button class="liten" onclick="lastNedIcsPerson('${esc(a.navn)}')">↓ .ics</button></td></tr>`;
-  }
+    html += `<tr><td>${esc(a.navn)}</td><td>${esc(a.yrkesgruppe)}</td><td>${esc(a.modaliteter.join(', '))}</td><td>${a.skift}</td><td>${Math.round(a.timer)}</td><td>${a.snitt_uke}${under}</td><td>${a.natt}</td>${rot ? `<td>${a.rotasjonsgruppe || ''}</td>` : ''}<td><button class="liten" onclick="lastNedIcsPerson(${ai})">↓ .ics</button></td></tr>`;
+  });
   html += '</table>';
   if (d.preferanser.totalt) html += `<p>Preferanser innfridd: ${d.preferanser.innfridd} av ${d.preferanser.totalt}</p>`;
   if (d.udekket.length) {
@@ -805,8 +816,8 @@ function visGenerert(d) {
   document.getElementById('resultat').innerHTML = html + '</section>';
 }
 
-function visAnsattDetalj(navn) {
-  const a = ((sisteResultat && sisteResultat.ansatte) || []).find(x => x.navn === navn);
+function visAnsattDetalj(idx) {
+  const a = ((sisteResultat && sisteResultat.ansatte) || [])[idx];
   if (!a) return;
   const grense = sisteResultat.tariff.norm * a.prosent / 100;
   let rader = '';
