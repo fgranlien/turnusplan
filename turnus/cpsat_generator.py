@@ -70,6 +70,8 @@ def loes_med_cpsat(
                 continue
             if not regler.helgfrekvens_ok(a, d):
                 continue
+            if not regler.skift_tilgang_ok(a, sd):
+                continue
             x[a.id, d, sd.navn] = model.NewBoolVar(f"x_{a.id}_{d.isoformat()}_{sd.navn}")
 
     for a in ansatte:

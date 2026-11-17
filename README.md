@@ -52,6 +52,10 @@ Krever bare Python 3 (følger med macOS via Command Line Tools; sjekk med `pytho
 - **Helgrullering per ansatt** – kolonnen «Helg hver N.» i Ansatte-fanen:
   3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helg; ansatte med samme
   frekvens staggres automatisk så helgene fordeles jevnt
+- **Skift-tilgang per ansatt** – kolonnen «Skift» i Ansatte-fanen begrenser
+  hvilke skift den ansatte kan jobbe (f.eks. «DAG, KVELD» = aldri natt).
+  Kombiner med «Helg hver N.» for å kjøre flere turnusgrupper med ulik
+  lengde og innhold parallellt i samme plan
 - **12-timers-tilvalg per ansatt** – kolonnen «12-t vakter/uke» i Ansatte-fanen
   setter hvor mange 12-timersvakter den ansatte ønsker per uke (tom = ingen
   grense, 0 = nei); håndheves av generatoren og ved vaktbytte

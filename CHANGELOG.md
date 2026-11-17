@@ -3,6 +3,22 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.20 – Kombinere turnusgrupper: hard skift-tilgang per ansatt
+
+- Ny kolonne «Skift» i Ansatte-fanen: kommaseparert liste av skiftnavnet
+  den ansatte KUN kan jobbe (f.eks. «DAG, KVELD»), tom = alle skift
+- Håndheves hardt av begge motorer: greedy (lovighetssjekk) og CP-SAT
+  (skift utenfor tilgangen fjernes fra modellen), og av vaktbytte
+- Gjør det mulig å kombinere grupper med ulik turnus i samme plan, f.eks.
+  7 personer uten nattevakter som jobber helg hver tredje helg, samtidig
+  som 10 personer går i en 10-ukers rullering med 12-timersvakter hver
+  femte helg (Skift-tilgang + «Helg hver N.» + generering over 10 uker)
+- Ny valideringsregel «Skifttilgang» i `valider_plan` så også importerte
+  planer og vaktbytt fanges
+- Lagres i `ansatte.json` (`skift_tilgang`) og rundtur via API-et
+- To nye motor-tester: grupper med ulik tilgang + helgrullering i samme
+  plan (begge motorer), og validering/lovighetssjekk av tilgangen
+
 ## 2.19 – GUI-rydding av Ansatte-fanen
 
 - Tabellen fikk mindre celler og kortere kolonneoverskrifter («Fravær»,

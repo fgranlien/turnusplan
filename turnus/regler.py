@@ -123,6 +123,12 @@ def uketimer_ok(ansatt: Ansatt, eksisterende: list[Skift], kandidat: Skift) -> b
     return timer <= grense + 1e-9
 
 
+def skift_tilgang_ok(ansatt: Ansatt, skift_def: SkiftDef) -> bool:
+    if not ansatt.skift_tilgang:
+        return True
+    return skift_def.navn.upper() in ansatt.skift_tilgang
+
+
 def matcher(onsker: set[str], skift_def: SkiftDef) -> bool:
     if skift_def.navn.upper() in onsker:
         return True
@@ -185,6 +191,8 @@ def kandidat_er_lovlig(
     langvakt_avtale: bool = True,
 ) -> bool:
     if kandidat.dato in ansatt.utilgjengelige_dager:
+        return False
+    if not skift_tilgang_ok(ansatt, kandidat.type):
         return False
     if not helgfrekvens_ok(ansatt, kandidat.dato):
         return False
@@ -321,6 +329,11 @@ def valider_plan(
         sortert = sorted(skift_liste)
 
         for skift in sortert:
+            if not skift_tilgang_ok(ansatt, skift.type):
+                feil.append(
+                    f"Skifttilgang: {ansatt.navn} har skift {skift.etikett} {skift.dato:%d.%m} "
+                    "utenfor sin tillatte skiftliste"
+                )
             lengde = _timer(skift)
             if lengde > MAKS_SKIFTLENGDE_MED_AVTALE + 1e-9:
                 feil.append(f"Skiftlengde: {ansatt.navn} har {lengde:.0f} t skift {skift.etikett} {skift.dato:%d.%m} (over maks {MAKS_SKIFTLENGDE_MED_AVTALE:.0f} t)")

@@ -61,6 +61,7 @@ class Ansatt:
     langvakt_uke_maks: int | None = None
     helg_hver_n: int | None = None
     helg_offset: int = 0
+    skift_tilgang: set[str] = field(default_factory=set)
 
 
 @dataclass(frozen=True)

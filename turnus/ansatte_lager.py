@@ -61,6 +61,7 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
     prosent = max(10.0, min(100.0, prosent))
     foretrekker = {str(s).strip().upper() for s in (rad.get("foretrekker") or []) if str(s).strip()}
     unnga = {str(s).strip().upper() for s in (rad.get("unnga") or []) if str(s).strip()}
+    skift_tilgang = {str(s).strip().upper() for s in (rad.get("skift_tilgang") or []) if str(s).strip()}
     raa_langvakt = rad.get("langvakt_uke_maks")
     if raa_langvakt is None or str(raa_langvakt).strip() == "":
         langvakt_maks = None
@@ -108,6 +109,7 @@ def til_ansatt(rad: dict, indeks: int, brukte_ider: set[str]) -> tuple[Ansatt, l
         utilgjengelige,
         langvakt_maks,
         helg_n,
+        skift_tilgang=skift_tilgang,
     )
     return ansatt, advarsler
 
@@ -125,6 +127,7 @@ def til_rad(a: Ansatt) -> dict:
         "utilgjengelige_dager": sorted(d.isoformat() for d in a.utilgjengelige_dager),
         "langvakt_uke_maks": a.langvakt_uke_maks,
         "helg_hver_n": a.helg_hver_n,
+        "skift_tilgang": sorted(a.skift_tilgang),
     }
 
 

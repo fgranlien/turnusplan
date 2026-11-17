@@ -231,7 +231,7 @@ button.spinner::after { content:''; display:inline-block; width:12px; height:12p
     <div id="ansatte-status"></div>
     <details class="tips">
       <summary>Tips om feltene</summary>
-      <p class="laster">I Fravær-feltet kan du angi enkelt datoer eller intervaller (f.eks. «2025-07-01 til 2025-07-14»), atskilt med komma. Radiografer må ha minst én modalitet. Fagradiografer er knyttet til én hovedmodalitet, og kan i tillegg dekte fagradiograf-plassene. I 12-t/uke-feltet angir du hvor mange 12-timersvakter den ansatte ønsker per uke: tom = ingen begrensning, 0 = ønsker ikke 12-timersvakter. I Helg hver N.-feltet angir du helgrullering: tom = ingen begrensning, 3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helgvakt. Ansatte med samme frekvens fordeles automatisk på ulike helger så jevnt som mulig. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
+      <p class="laster">I Fravær-feltet kan du angi enkelt datoer eller intervaller (f.eks. «2025-07-01 til 2025-07-14»), atskilt med komma. Radiografer må ha minst én modalitet. Fagradiografer er knyttet til én hovedmodalitet, og kan i tillegg dekte fagradiograf-plassene. I 12-t/uke-feltet angir du hvor mange 12-timersvakter den ansatte ønsker per uke: tom = ingen begrensning, 0 = ønsker ikke 12-timersvakter. I Helg hver N.-feltet angir du helgrullering: tom = ingen begrensning, 3 = hver tredje helg, 4 = hver fjerde helg, 0 = aldri helgvakt. I Skift-feltet angir du hvilke skift den ansatte KUN kan jobbe (kommaseparerte skiftnavn, f.eks. «DAG, KVELD») – tom = alle skift. Bruk dette til å kombinere grupper med ulik turnus, f.eks. én gruppe uten natt og én gruppe med bare 12-timersvakter. Ansatte med samme frekvens fordeles automatisk på ulike helger så jevnt som mulig. Lagret listen brukes av generatoren i stedet for demopoolen.</p>
     </details>
   </section>
   </div>
@@ -452,7 +452,7 @@ async function lastAnsatte() {
     const r = await fetch('/api/ansatte');
     const d = await r.json();
     ansatteKilde = d.kilde;
-    ansatteListe = d.ansatte.map(a => ({...a, modaliteter: [...a.modaliteter], foretrekker: [...a.foretrekker], unnga: [...a.unnga], utilgjengelige_dager: [...a.utilgjengelige_dager]}));
+    ansatteListe = d.ansatte.map(a => ({...a, modaliteter: [...a.modaliteter], foretrekker: [...a.foretrekker], unnga: [...a.unnga], utilgjengelige_dager: [...a.utilgjengelige_dager], skift_tilgang: [...(a.skift_tilgang || [])]}));
     document.getElementById('ansatte-kilde').textContent = d.kilde === 'lagret'
       ? 'Redigerer lagret ansattliste (ansatte.json).'
       : 'Viser demopool – rediger og lagre for å bruke egne ansatte i stedet.';
@@ -464,7 +464,7 @@ async function lastAnsatte() {
 }
 
 function renderAnsatte() {
-  let html = '<table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Stilling %</th><th>Foretrekker</th><th>Unngå</th><th>Fravær</th><th>12-t/uke</th><th>Helg hver N.</th><th></th></tr>';
+  let html = '<table><tr><th>Navn</th><th>Yrkesgruppe</th><th>Modaliteter</th><th>Stilling %</th><th>Foretrekker</th><th>Unngå</th><th>Fravær</th><th>12-t/uke</th><th>Helg hver N.</th><th>Skift</th><th></th></tr>';
   ansatteListe.forEach((a, i) => {
     const fagra = a.yrkesgruppe === 'fagradiograf';
     let modHtml;
@@ -498,6 +498,7 @@ function renderAnsatte() {
       `<td><input type="text" value="${esc((a.utilgjengelige_dager || []).join(', '))}" style="width:150px" placeholder="2025-07-01 til 07-14" oninput="settFerie(${i}, this.value)"></td>` +
       `<td><input type="number" min="0" max="7" value="${a.langvakt_uke_maks ?? ''}" style="width:56px" placeholder="–" title="Tom = ingen begrensning, 0 = ønsker ikke 12-timersvakter" oninput="settLangvakt(${i}, this.value)"></td>` +
       `<td><input type="number" min="0" max="12" value="${a.helg_hver_n ?? ''}" style="width:56px" placeholder="–" title="Tom = ingen begrensning, 3 = hver tredje helg, 0 = aldri helgvakt" oninput="settHelg(${i}, this.value)"></td>` +
+      `<td><input type="text" value="${esc((a.skift_tilgang || []).join(', '))}" style="width:120px" placeholder="alle" title="Kommaseparert liste av skiftnavn den ansatte KUN kan jobbe, f.eks. DAG, KVELD. Tom = alle skift." oninput="settSkiftTilgang(${i}, this.value)"></td>` +
       `<td><button style="background:var(--grå);padding:6px 10px;font-size:12.5px" onclick="fjernAnsatt(${i})">Fjern</button></td>` +
       `</tr>`;
   });
@@ -505,6 +506,10 @@ function renderAnsatte() {
 }
 
 function settFelt(i, felt, verdi) { ansatteListe[i][felt] = verdi; }
+
+function settSkiftTilgang(i, verdi) {
+  ansatteListe[i].skift_tilgang = verdi.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+}
 
 function settMod(i, m, valgt) {
   const s = new Set(ansatteListe[i].modaliteter);

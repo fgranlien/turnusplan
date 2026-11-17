@@ -191,6 +191,40 @@ class MotorerTest(unittest.TestCase):
         self.assertFalse(regler.matcher({"NATT"}, DAG12))
         self.assertTrue(regler.matcher({"DAG"}, DAG))
 
+    def test_skift_tilgang_kombinerer_grupper(self):
+        gruppe_a = [
+            radiograf(f"Dag{i}", {"R\u00f8ntgen"}, skift_tilgang={"DAG", "KVELD"}, helg_hver_n=3)
+            for i in range(1, 4)
+        ]
+        gruppe_b = [
+            radiograf(f"Lang{i}", {"R\u00f8ntgen"}, skift_tilgang={"DAG12", "NATT12"}, helg_hver_n=5)
+            for i in range(1, 4)
+        ]
+        ansatte = gruppe_a + gruppe_b
+        regler.sett_helg_offsatter(ansatte)
+        bemanning = {
+            "DAG": {"R\u00f8ntgen": {"hverdag": 1, "helg": 1}},
+            "NATT12": {"R\u00f8ntgen": {"hverdag": 1, "helg": 0}},
+        }
+        behov = bygg_behov(bemanning, [DAG, KVELD, NATT, DAG12, NATT12])
+        greedy, los = self.sjekk_begge(ansatte, behov, [DAG, KVELD, NATT, DAG12, NATT12], 14)
+        for motor, tildelinger in (("greedy", greedy.tildelinger), ("cpsat", los.tildelinger)):
+            for a in gruppe_a:
+                for s in tildelinger[a.id]:
+                    self.assertFalse(s.type.er_natt, f"{motor}: {a.navn} fikk nattskift {s}")
+                    self.assertNotIn(s.type.navn, ("NATT", "NATT12"), f"{motor}: {a.navn} fikk {s.type.navn}")
+            for a in gruppe_b:
+                for s in tildelinger[a.id]:
+                    self.assertIn(s.type.navn, ("DAG12", "NATT12"), f"{motor}: {a.navn} fikk {s.type.navn}")
+
+    def test_skift_tilgang_valideres(self):
+        a = radiograf("KunDag", {"R\u00f8ntgen"}, skift_tilgang={"DAG"})
+        plan = {a.id: [Skift(START, NATT)]}
+        feil = regler.valider_plan(plan, [a], {}, START, 1, [DAG, NATT])
+        self.assertTrue(any("Skifttilgang" in f for f in feil))
+        self.assertFalse(regler.kandidat_er_lovlig(a, [], Skift(START, NATT)))
+        self.assertTrue(regler.kandidat_er_lovlig(a, [], Skift(START, DAG)))
+
     def test_ansatte_lager_rundertrip_navn_preferanser(self):
         with tempfile.TemporaryDirectory() as tmp:
             ansatte_lager.FIL = Path(tmp) / "ansatte.json"
