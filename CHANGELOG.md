@@ -3,6 +3,18 @@
 Versjonsnummerering: **heltall** (2.0 → 3.0) for større omstruktureringer,
 **desimal** (2.3 → 2.4) for mindre endringer og forbedringer.
 
+## 2.19 – GUI-rydding av Ansatte-fanen
+
+- Tabellen fikk mindre celler og kortere kolonneoverskrifter («Fravær»,
+  «12-t/uke») så alt får plass
+- Modalitetene for radiografer vises nå i et kompakt rutenett (to kolonner)
+  i stedet for én lang rekke som presset resten av tabellen utenfor kortet
+- Tabellen ruller horisontalt innenfor kortet hvis vinduet er smalt
+  (samme rulle-atferd som vaktmatrisen), i stedet for at teksten renner ut
+- Fraværsfeltet er smalere med kortere eksempel-tekst
+- Den lange forklaringsteksten nederst er nå sammenleggbar
+  («Tips om feltene») så fanen starter ryddig
+
 ## 3.0 – Motor-omstrukturering: plassmodell, snittnorm og felles ukeshvile i CP-SAT
 
 Større omstrukturering av CP-SAT-motoren etter ekstern kodegjennomgang
